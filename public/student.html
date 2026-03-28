@@ -630,82 +630,26 @@ function listenToSession(sid) {
         askBtn.disabled = true;
 
         try {
-          // Require context; if missing, don't save
-          if (!currentContextRaw) {
-            console.error("[Question Validation] CRITICAL: No session context (contextRaw missing); blocking question");
-            document.getElementById("questionInput").value = "";
-            askBtn.textContent = "✅ Question received";
-            setTimeout(() => { askBtn.textContent = "Ask anonymously →"; }, 2000);
-            return;
-          }
 
-          console.log("[Question Validation] START: Question validation", {
-            question: text.substring(0, 50) + (text.length > 50 ? "..." : ""),
-            contextRaw: !!currentContextRaw,
-            contextTopics: currentContextTopics,
-            contextSummary: currentContextSummary.substring(0, 50),
-          });
+    // Directly save question to Firestore
+    await addDoc(collection(db, "sessions", sessionId, "questions"), {
+      text: text,
+      upvotes: 0,
+      askedAt: serverTimestamp(),
+      studentId: studentId
+    });
 
-          const validateRes = await fetch("/validate-question", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              question: text,
-              contextRaw: currentContextRaw,
-              contextTopics: currentContextTopics,
-              contextSummary: currentContextSummary || currentContextRaw,
-            }),
-          });
+    document.getElementById("qSent").style.display = "block";
+    askBtn.textContent = "✓ Sent";
+    input.value = "";
 
-          console.log("[Question Validation] API Response Status:", validateRes.status, validateRes.statusText);
-
-          if (!validateRes.ok) {
-            console.error("[Question Validation] API returned non-ok status; blocking save");
-            askBtn.disabled    = false;
-            askBtn.textContent = "Submit question →";
-            return;
-          }
-
-          let validation;
-          try {
-            validation = await validateRes.json();
-          } catch (parseErr) {
-            console.error("[Question Validation] Failed to parse JSON response; blocking save", parseErr);
-            askBtn.disabled    = false;
-            askBtn.textContent = "Submit question →";
-            return;
-          }
-
-          console.log("[Question Validation] API Response Data:", validation);
-
-          // EXPLICIT CHECK: Distinguish between true, false, and error
-          if (validation?.isRelevant === true) {
-            console.log("[Question Validation] ✅ APPROVED (isRelevant === true); saving to Firestore");
-            await addDoc(collection(db, "sessions", sessionId, "questions"), {
-              text,
-              upvotes:   0,
-              askedAt:   serverTimestamp(),
-              studentId,
-            });
-            document.getElementById("qSent").style.display = "block";
-            askBtn.textContent = "✓ Sent";
-            input.value        = "";
-          } else if (validation?.isRelevant === false) {
-            console.log("[Question Validation] ❌ REJECTED (isRelevant === false); NOT saving");
-            askBtn.disabled    = false;
-            askBtn.textContent = "Submit question →";
-          } else {
-            console.warn("[Question Validation] ⚠️ UNKNOWN (isRelevant not boolean); blocking save");
-            askBtn.disabled    = false;
-            askBtn.textContent = "Submit question →";
-          }
-        } catch (e) {
-          console.error("[Question Validation] EXCEPTION:", e);
-          alert("Could not send question. Try again.");
-          askBtn.disabled    = false;
-          askBtn.textContent = "Submit question →";
-        }
-      };
+  } catch (e) {
+    console.error("Question save failed:", e);
+    alert("Could not send question. Try again.");
+    askBtn.disabled    = false;
+    askBtn.textContent = "Submit question →";
+  }
+};
 
       // Enter key to join
       document.getElementById("codeInput").addEventListener("keydown", e => {
