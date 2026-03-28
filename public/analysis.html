@@ -1,0 +1,730 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ClassPulse - Session Analytics</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <style>
+      :root {
+        --bg: #f4f7f4;
+        --card: #ffffff;
+        --ink: #1b1f1d;
+        --muted: #6f7872;
+        --line: #e3e9e4;
+        --good: #1d9e75;
+        --sort: #c48a00;
+        --lost: #d85a30;
+        --accent: #1f4d3a;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+        background: radial-gradient(circle at 10% -20%, #dfeee6 0%, transparent 45%), var(--bg);
+        color: var(--ink);
+        min-height: 100vh;
+        padding: 24px;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+
+      .header h1 {
+        font-size: 30px;
+        letter-spacing: -0.5px;
+      }
+
+      .header p {
+        color: var(--muted);
+        margin-top: 6px;
+        font-size: 14px;
+      }
+
+      .session-pill {
+        background: #eaf2ed;
+        border: 1px solid #d4e2d8;
+        color: var(--accent);
+        border-radius: 999px;
+        padding: 8px 14px;
+        font-weight: 600;
+        font-size: 13px;
+      }
+
+      .section-grid {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 14px;
+        margin-bottom: 14px;
+      }
+
+      .card {
+        background: var(--card);
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        padding: 16px;
+        box-shadow: 0 4px 20px rgba(17, 27, 22, 0.05);
+      }
+
+      .summary-card {
+        grid-column: span 2;
+        min-height: 100px;
+      }
+
+      .label {
+        font-size: 11px;
+        color: var(--muted);
+        letter-spacing: 0.9px;
+        text-transform: uppercase;
+      }
+
+      .value {
+        margin-top: 10px;
+        font-size: 28px;
+        font-weight: 700;
+      }
+
+      .subvalue {
+        margin-top: 8px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .good { color: var(--good); }
+      .sort { color: var(--sort); }
+      .lost { color: var(--lost); }
+
+      .wide {
+        grid-column: span 8;
+      }
+
+      .medium {
+        grid-column: span 4;
+      }
+
+      .section-title {
+        font-size: 12px;
+        color: var(--muted);
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+      }
+
+      .chart-wrap {
+        height: 320px;
+      }
+
+      .list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .list-item {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        background: #fbfcfb;
+      }
+
+      .list-item strong {
+        font-size: 14px;
+      }
+
+      .list-item small {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+      }
+
+      .alert {
+        background: #fdecea;
+        border: 1px solid #f8d4ca;
+        color: var(--lost);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-weight: 600;
+      }
+
+      .ok {
+        background: #e8f7f1;
+        border: 1px solid #ccecdf;
+        color: var(--good);
+      }
+
+      .muted { color: var(--muted); }
+
+      .insight {
+        background: #eef4f0;
+        border: 1px solid #dbe7df;
+        border-left: 4px solid var(--accent);
+        border-radius: 10px;
+        padding: 10px 12px;
+      }
+
+      .themes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .theme-tag {
+        background: #f0f5f2;
+        border: 1px solid #dce7df;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 12px;
+        color: #30503f;
+      }
+
+      #status {
+        padding: 14px;
+        margin-bottom: 14px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--muted);
+      }
+
+      @media (max-width: 1000px) {
+        .summary-card { grid-column: span 4; }
+        .wide { grid-column: span 12; }
+        .medium { grid-column: span 12; }
+      }
+
+      @media (max-width: 640px) {
+        body { padding: 14px; }
+        .header { flex-direction: column; align-items: flex-start; }
+        .summary-card { grid-column: span 6; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header class="header">
+        <div>
+          <h1>Post-Session Analytics</h1>
+          <p id="sessionMeta">Loading session data...</p>
+        </div>
+        <div id="sessionPill" class="session-pill">Session --</div>
+      </header>
+
+      <div id="status">Loading analytics...</div>
+
+      <section class="section-grid" id="summaryGrid" style="display: none;"></section>
+
+      <section class="section-grid" id="dashboardGrid" style="display: none;">
+        <article class="card wide">
+          <p class="section-title">Response Trend Over Time</p>
+          <div class="chart-wrap"><canvas id="responseChart"></canvas></div>
+          <p class="subvalue">X-axis: response time | Y-axis: response count</p>
+        </article>
+
+        <article class="card medium">
+          <p class="section-title">Confusion Alerts</p>
+          <div id="confusionAlerts" class="list"></div>
+        </article>
+
+        <article class="card medium">
+          <p class="section-title">Engagement Analytics</p>
+          <div id="engagementMetrics" class="list"></div>
+        </article>
+
+        <article class="card medium">
+          <p class="section-title">AI Insights & Suggestions</p>
+          <div id="aiInsights" class="list"></div>
+        </article>
+
+        <article class="card wide">
+          <p class="section-title">Questions Analysis</p>
+          <div id="questionThemes" class="themes" style="margin-bottom: 12px;"></div>
+          <div id="questionList" class="list"></div>
+        </article>
+      </section>
+    </div>
+
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+      import {
+        getFirestore,
+        collection,
+        doc,
+        getDoc,
+        getDocs,
+      } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyB0lQ4kN9YBskuaNp-8AcOfTAfUYPbhSbU",
+        authDomain: "classpulse-97289.firebaseapp.com",
+        projectId: "classpulse-97289",
+        storageBucket: "classpulse-97289.firebasestorage.app",
+        messagingSenderId: "844668167541",
+        appId: "1:844668167541:web:dfd90a7024876a30d05f3c",
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      function getSessionIdFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get("session");
+      }
+
+      function toDateSafe(value) {
+        if (!value) return null;
+        if (typeof value.toDate === "function") return value.toDate();
+        if (value.seconds) return new Date(value.seconds * 1000);
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+      }
+
+      function formatTime(date) {
+        return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      }
+
+      function minuteBucket(date) {
+        const d = new Date(date);
+        d.setSeconds(0, 0);
+        return d.toISOString();
+      }
+
+      async function fetchSessionData(sessionId) {
+        const sessionRef = doc(db, "sessions", sessionId);
+        const sessionSnap = await getDoc(sessionRef);
+        if (!sessionSnap.exists()) {
+          throw new Error("Session not found.");
+        }
+
+        const sessionData = { id: sessionSnap.id, ...sessionSnap.data() };
+
+        const studentsSnap = await getDocs(collection(db, "sessions", sessionId, "students"));
+        const students = studentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+        const questionsSnap = await getDocs(collection(db, "sessions", sessionId, "questions"));
+        const questions = questionsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+        return { session: sessionData, students, questions };
+      }
+
+      function buildTimelinePoints(students) {
+        const events = students
+          .map((s) => ({ signal: s.signal, time: toDateSafe(s.updatedAt) }))
+          .filter((e) => e.time && ["got_it", "sort_of", "lost"].includes(e.signal))
+          .sort((a, b) => a.time - b.time);
+
+        const got = [];
+        const sort = [];
+        const lost = [];
+        let g = 0;
+        let s = 0;
+        let l = 0;
+
+        events.forEach((e) => {
+          if (e.signal === "got_it") g += 1;
+          if (e.signal === "sort_of") s += 1;
+          if (e.signal === "lost") l += 1;
+          const label = formatTime(e.time);
+          got.push({ x: label, y: g, t: e.time });
+          sort.push({ x: label, y: s, t: e.time });
+          lost.push({ x: label, y: l, t: e.time });
+        });
+
+        return { events, got, sort, lost };
+      }
+
+      function processAnalytics({ session, students, questions }) {
+        const totalResponses = students.length;
+        const gotCount = students.filter((s) => s.signal === "got_it").length;
+        const sortCount = students.filter((s) => s.signal === "sort_of").length;
+        const lostCount = students.filter((s) => s.signal === "lost").length;
+
+        const gotPct = totalResponses ? Math.round((gotCount / totalResponses) * 100) : 0;
+        const sortPct = totalResponses ? Math.round((sortCount / totalResponses) * 100) : 0;
+        const lostPct = totalResponses ? Math.round((lostCount / totalResponses) * 100) : 0;
+
+        const timeline = buildTimelinePoints(students);
+        const lossByMinute = new Map();
+        const responseByMinute = new Map();
+
+        timeline.events.forEach((e) => {
+          const bucket = minuteBucket(e.time);
+          responseByMinute.set(bucket, (responseByMinute.get(bucket) || 0) + 1);
+          if (e.signal === "lost") {
+            lossByMinute.set(bucket, (lossByMinute.get(bucket) || 0) + 1);
+          }
+        });
+
+        let peakConfusion = "No lost signals";
+        let peakLost = 0;
+        for (const [bucket, count] of lossByMinute.entries()) {
+          if (count > peakLost) {
+            peakLost = count;
+            peakConfusion = `${formatTime(new Date(bucket))} (${count} lost)`;
+          }
+        }
+
+        const activeStudents = students.filter((s) => toDateSafe(s.updatedAt)).length;
+        const participationRate = totalResponses
+          ? Math.round((activeStudents / totalResponses) * 100)
+          : 0;
+
+        const dropIntervals = [];
+        for (const [bucket, count] of responseByMinute.entries()) {
+          if (count <= 1) {
+            dropIntervals.push(`Low activity at ${formatTime(new Date(bucket))}`);
+          }
+        }
+
+        return {
+          session,
+          questions,
+          totalResponses,
+          gotCount,
+          sortCount,
+          lostCount,
+          gotPct,
+          sortPct,
+          lostPct,
+          peakConfusion,
+          totalQuestions: questions.length,
+          totalStudentsConnected: totalResponses,
+          activeParticipationRate: participationRate,
+          responseFrequency: responseByMinute,
+          dropIntervals,
+          timeline,
+          lossByMinute,
+        };
+      }
+
+      function renderSummaryCards(model) {
+        const summaryGrid = document.getElementById("summaryGrid");
+        summaryGrid.innerHTML = `
+          <article class="card summary-card">
+            <p class="label">Total Responses</p>
+            <p class="value">${model.totalResponses}</p>
+            <p class="subvalue">Students who sent a signal</p>
+          </article>
+          <article class="card summary-card">
+            <p class="label">Got it</p>
+            <p class="value good">${model.gotPct}%</p>
+            <p class="subvalue">${model.gotCount} responses</p>
+          </article>
+          <article class="card summary-card">
+            <p class="label">Sort of</p>
+            <p class="value sort">${model.sortPct}%</p>
+            <p class="subvalue">${model.sortCount} responses</p>
+          </article>
+          <article class="card summary-card">
+            <p class="label">Lost</p>
+            <p class="value lost">${model.lostPct}%</p>
+            <p class="subvalue">${model.lostCount} responses</p>
+          </article>
+          <article class="card summary-card">
+            <p class="label">Peak Confusion Time</p>
+            <p class="value" style="font-size:22px;">${model.peakConfusion}</p>
+            <p class="subvalue">Highest concentration of lost signals</p>
+          </article>
+          <article class="card summary-card">
+            <p class="label">Total Questions</p>
+            <p class="value">${model.totalQuestions}</p>
+            <p class="subvalue">Student questions captured</p>
+          </article>
+        `;
+      }
+
+      function renderResponseChart(model) {
+        const chartCanvas = document.getElementById("responseChart");
+        const labels = model.timeline.got.map((p) => p.x);
+        const gotSeries = model.timeline.got.map((p) => p.y);
+        const sortSeries = model.timeline.sort.map((p) => p.y);
+        const lostSeries = model.timeline.lost.map((p) => p.y);
+
+        new Chart(chartCanvas, {
+          type: "line",
+          data: {
+            labels,
+            datasets: [
+              {
+                label: "Got it",
+                data: gotSeries,
+                borderColor: "#1d9e75",
+                backgroundColor: "rgba(29, 158, 117, 0.12)",
+                tension: 0.28,
+                fill: false,
+                pointRadius: 3,
+              },
+              {
+                label: "Sort of",
+                data: sortSeries,
+                borderColor: "#c48a00",
+                backgroundColor: "rgba(196, 138, 0, 0.12)",
+                tension: 0.28,
+                fill: false,
+                pointRadius: 3,
+              },
+              {
+                label: "Lost",
+                data: lostSeries,
+                borderColor: "#d85a30",
+                backgroundColor: "rgba(216, 90, 48, 0.16)",
+                tension: 0.2,
+                fill: false,
+                pointRadius: 4,
+                pointBackgroundColor: "#d85a30",
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: "top" },
+              tooltip: { mode: "index", intersect: false },
+            },
+            interaction: { mode: "nearest", axis: "x", intersect: false },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: { precision: 0 },
+                title: { display: true, text: "Responses" },
+              },
+              x: {
+                title: { display: true, text: "Time" },
+              },
+            },
+          },
+        });
+      }
+
+      function detectConfusionAlerts(model) {
+        const alertsEl = document.getElementById("confusionAlerts");
+        const alerts = [];
+
+        for (const [bucket, count] of model.lossByMinute.entries()) {
+          if (count >= 1) {
+            alerts.push(`High confusion at ${formatTime(new Date(bucket))} (${count} lost signal${count > 1 ? "s" : ""})`);
+          }
+        }
+
+        alerts.sort();
+
+        if (alerts.length === 0) {
+          alertsEl.innerHTML = '<div class="alert ok">No confusion spikes detected.</div>';
+          return;
+        }
+
+        alertsEl.innerHTML = alerts
+          .map((a) => `<div class="alert">\u26a0 ${a}</div>`)
+          .join("");
+      }
+
+      function renderEngagementAnalytics(model) {
+        const engagementEl = document.getElementById("engagementMetrics");
+        const intervalCount = model.responseFrequency.size;
+        const avgFrequency = intervalCount
+          ? (model.totalResponses / intervalCount).toFixed(2)
+          : "0.00";
+
+        const dropped = model.dropIntervals.length
+          ? model.dropIntervals.map((d) => `<div class="list-item"><strong>${d}</strong></div>`).join("")
+          : '<div class="list-item"><strong>No low-activity intervals detected.</strong></div>';
+
+        engagementEl.innerHTML = `
+          <div class="list-item">
+            <strong>Total students connected: ${model.totalStudentsConnected}</strong>
+            <small>Based on student response records</small>
+          </div>
+          <div class="list-item">
+            <strong>Active participation rate: ${model.activeParticipationRate}%</strong>
+            <small>Students with valid response timestamps</small>
+          </div>
+          <div class="list-item">
+            <strong>Response frequency: ${avgFrequency} responses/active interval</strong>
+            <small>Active interval = minute bucket with at least one response</small>
+          </div>
+          ${dropped}
+        `;
+      }
+
+      function generateAiInsights(model) {
+        const insights = [];
+
+        if (model.lostPct > 40) {
+          insights.push("Students struggled significantly. Re-teach core concept with slower pacing and one worked example.");
+        }
+        if (model.sortPct >= 35) {
+          insights.push("Concept needs reinforcement. Add a short checkpoint question before moving to the next topic.");
+        }
+        if (model.gotPct >= 60) {
+          insights.push("Concept appears well understood. Consider moving forward with one stretch challenge.");
+        }
+        if (model.totalQuestions >= 5) {
+          insights.push("High question volume suggests uncertainty pockets. Address top repeated question themes first.");
+        }
+        if (insights.length === 0) {
+          insights.push("Signal distribution is balanced. Continue with quick formative checks to keep alignment.");
+        }
+
+        return {
+          source: "rules-v1",
+          generatedAt: new Date().toISOString(),
+          suggestions: insights,
+        };
+      }
+
+      function renderAiInsights(model) {
+        const insightEl = document.getElementById("aiInsights");
+        const insightModel = generateAiInsights(model);
+
+        insightEl.innerHTML = insightModel.suggestions
+          .map(
+            (s) =>
+              `<div class="insight"><strong>Suggestion:</strong> ${s}<small class="muted" style="display:block;margin-top:6px;">Engine: ${insightModel.source}</small></div>`
+          )
+          .join("");
+      }
+
+      function normalizeQuestionText(text) {
+        return (text || "")
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      function questionThemeKey(text) {
+        const normalized = normalizeQuestionText(text);
+        if (!normalized) return "uncategorized";
+        const words = normalized.split(" ").filter((w) => w.length > 3);
+        return words.slice(0, 2).join(" ") || "general";
+      }
+
+      function renderQuestionsAnalysis(model) {
+        const qListEl = document.getElementById("questionList");
+        const themeEl = document.getElementById("questionThemes");
+
+        if (!model.questions || model.questions.length === 0) {
+          themeEl.innerHTML = "";
+          qListEl.innerHTML = '<div class="list-item"><strong>No student questions recorded for this session.</strong></div>';
+          return;
+        }
+
+        const withDates = model.questions.map((q) => ({
+          ...q,
+          askedAtDate: toDateSafe(q.askedAt),
+        }));
+
+        const byRecency = [...withDates].sort((a, b) => {
+          const at = a.askedAtDate ? a.askedAtDate.getTime() : 0;
+          const bt = b.askedAtDate ? b.askedAtDate.getTime() : 0;
+          return bt - at;
+        });
+
+        const byFrequency = new Map();
+        for (const q of withDates) {
+          const key = normalizeQuestionText(q.text || "");
+          if (!key) continue;
+          const current = byFrequency.get(key) || { count: 0, sample: q.text };
+          current.count += 1;
+          byFrequency.set(key, current);
+        }
+
+        const topRepeated = [...byFrequency.entries()]
+          .sort((a, b) => b[1].count - a[1].count)
+          .slice(0, 3);
+
+        const themes = new Map();
+        for (const q of withDates) {
+          const key = questionThemeKey(q.text || "");
+          themes.set(key, (themes.get(key) || 0) + 1);
+        }
+
+        themeEl.innerHTML = [...themes.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 6)
+          .map(([k, v]) => `<span class="theme-tag">${k} (${v})</span>`)
+          .join("");
+
+        const repeatedHtml = topRepeated
+          .map(
+            ([, data]) =>
+              `<div class="list-item"><strong>Common question:</strong> ${data.sample}<small>Frequency: ${data.count}</small></div>`
+          )
+          .join("");
+
+        const recentHtml = byRecency
+          .slice(0, 5)
+          .map(
+            (q) =>
+              `<div class="list-item"><strong>${q.text || "(empty)"}</strong><small>Asked: ${q.askedAtDate ? formatTime(q.askedAtDate) : "Unknown time"}</small></div>`
+          )
+          .join("");
+
+        qListEl.innerHTML = `${repeatedHtml}${recentHtml}`;
+      }
+
+      function setHeader(session) {
+        const sessionMeta = document.getElementById("sessionMeta");
+        const sessionPill = document.getElementById("sessionPill");
+        sessionMeta.textContent = `${session.sessionName || "Session"} · ${session.teacherName || "Teacher"}`;
+        sessionPill.textContent = `Session ${session.id}`;
+      }
+
+      function showError(message) {
+        const status = document.getElementById("status");
+        status.textContent = message;
+        status.style.borderColor = "#f2d0c9";
+        status.style.background = "#fff5f3";
+        status.style.color = "#c14925";
+      }
+
+      function showLoaded() {
+        document.getElementById("status").style.display = "none";
+        document.getElementById("summaryGrid").style.display = "grid";
+        document.getElementById("dashboardGrid").style.display = "grid";
+      }
+
+      async function initializeAnalyticsPage() {
+        const sessionId = getSessionIdFromUrl();
+        if (!sessionId) {
+          showError("Missing session ID. Open this page with ?session=SESSION_ID.");
+          return;
+        }
+
+        try {
+          const raw = await fetchSessionData(sessionId);
+          const model = processAnalytics(raw);
+          setHeader(model.session);
+          renderSummaryCards(model);
+          renderResponseChart(model);
+          detectConfusionAlerts(model);
+          renderEngagementAnalytics(model);
+          renderAiInsights(model);
+          renderQuestionsAnalysis(model);
+          showLoaded();
+        } catch (error) {
+          console.error(error);
+          showError(error.message || "Failed to load analytics.");
+        }
+      }
+
+      initializeAnalyticsPage();
+    </script>
+  </body>
+</html>

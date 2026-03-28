@@ -11,6 +11,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="session-code" />
         <Stack.Screen name="dashboard" />
+        <Stack.Screen name="analysis" />
       </Stack>
     </ThemeProvider>
   );

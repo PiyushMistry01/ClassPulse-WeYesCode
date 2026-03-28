@@ -192,7 +192,7 @@ export default function Dashboard() {
         if (!session) return;
         await updateDoc(doc(db, 'sessions', session.sessionId), { active: false, ended: true });
         await AsyncStorage.removeItem('currentSession');
-        router.replace('/');
+        router.replace({ pathname: '/analysis', params: { sessionId: session.sessionId } } as any);
       }}
     ]);
   }
