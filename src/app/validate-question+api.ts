@@ -54,22 +54,38 @@ export async function POST(request: Request) {
       return Response.json({ isRelevant: false }, { status: 200 });
     }
 
-    const prompt = `You are checking if a student question is relevant to a classroom session.
+    const prompt = `You are a classroom question validator. Your job is to determine if a student comment/question is relevant and contextual to the class content.
 
-Context:
+Class Context Summary:
 ${contextSummary}
-Topics: ${contextTopics.join(', ')}
 
-Question:
+Class Topics:
+${contextTopics.join(', ')}
+
+Full Class Context:
+${contextRaw}
+
+Student Question/Comment:
 "${question}"
 
-Rules:
-- Allow if question is related to the topic, even loosely
-- Allow if it is a genuine doubt
-- Reject if it is spam, joke, personal, or unrelated
-- Be lenient, not strict
+Validation Rules:
+1. REJECT (isRelevant: false) if:
+   - The question is spam, off-topic, or jokes
+   - It's purely personal (not related to class content)
+   - It's advertising, promotional, or harmful
+   - It's unrelated to ANY of the listed topics
+   - It's gibberish or nonsensical
 
-Return ONLY JSON:
+2. ALLOW (isRelevant: true) if:
+   - Question relates to ANY of the topics covered
+   - It's a genuine doubt about the course material
+   - It's asking for clarification on content
+   - It's a follow-up question related to the lesson
+   - It's contextually relevant even if asked in different words
+
+Be STRICT about rejecting off-topic content. Only allow questions that are clearly related to the classroom context.
+
+Return ONLY valid JSON (no other text):
 {
   "isRelevant": true or false
 }`;
@@ -108,21 +124,25 @@ Return ONLY JSON:
 
     try {
       const result = parseValidation(raw);
-      console.log('Question validation result:', result);
+      const verdict = result.isRelevant ? '✅ APPROVED' : '❌ REJECTED';
+      console.log(`[validate-question API] ${verdict} | Question: "${question.substring(0, 50)}..."`);
       return Response.json(result);
     } catch (parseErr) {
-      console.warn('Failed to parse validation response:', parseErr, 'raw:', raw);
+      console.warn('[validate-question API] ⚠️ Failed to parse validation response:', parseErr, 'raw:', raw);
       const firstBrace = raw.indexOf('{');
       const lastBrace = raw.lastIndexOf('}');
       if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
-        console.warn('No valid JSON found in OpenAI response');
+        console.warn('[validate-question API] ❌ No valid JSON found in OpenAI response');
         return Response.json({ isRelevant: false });
       }
 
       try {
-        return Response.json(parseValidation(raw.slice(firstBrace, lastBrace + 1)));
+        const result = parseValidation(raw.slice(firstBrace, lastBrace + 1));
+        const verdict = result.isRelevant ? '✅ APPROVED' : '❌ REJECTED';
+        console.log(`[validate-question API] ${verdict} (from retry) | Question: "${question.substring(0, 50)}..."`);
+        return Response.json(result);
       } catch {
-        console.warn('Final parse attempt failed');
+        console.warn('[validate-question API] Final parse attempt failed');
         return Response.json({ isRelevant: false });
       }
     }

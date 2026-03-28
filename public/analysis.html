@@ -353,6 +353,11 @@
         const gotCount = students.filter((s) => s.signal === "got_it").length;
         const sortCount = students.filter((s) => s.signal === "sort_of").length;
         const lostCount = students.filter((s) => s.signal === "lost").length;
+        const contextSummary = typeof session.contextSummary === "string" ? session.contextSummary : "";
+        const contextPurpose = typeof session.contextPurpose === "string" ? session.contextPurpose : "";
+        const contextTopics = Array.isArray(session.contextTopics)
+          ? session.contextTopics.filter((t) => typeof t === "string")
+          : [];
 
         const gotPct = totalResponses ? Math.round((gotCount / totalResponses) * 100) : 0;
         const sortPct = totalResponses ? Math.round((sortCount / totalResponses) * 100) : 0;
@@ -394,6 +399,9 @@
         return {
           session,
           questions,
+          contextSummary,
+          contextPurpose,
+          contextTopics,
           totalResponses,
           gotCount,
           sortCount,
@@ -444,6 +452,11 @@
             <p class="label">Total Questions</p>
             <p class="value">${model.totalQuestions}</p>
             <p class="subvalue">Student questions captured</p>
+          </article>
+          <article class="card summary-card" style="grid-column: span 6;">
+            <p class="label">Class Purpose (from Faculty Context)</p>
+            <p class="value" style="font-size:18px;line-height:1.3;">${model.contextPurpose || "No context purpose extracted yet"}</p>
+            <p class="subvalue">Topics: ${model.contextTopics.length ? model.contextTopics.join(", ") : "N/A"}</p>
           </article>
         `;
       }
@@ -564,6 +577,13 @@
 
       function generateAiInsights(model) {
         const insights = [];
+
+        if (model.contextPurpose) {
+          insights.push(`Teaching purpose detected: ${model.contextPurpose}`);
+        }
+        if (model.contextSummary) {
+          insights.push(`Context summary: ${model.contextSummary}`);
+        }
 
         if (model.lostPct > 40) {
           insights.push("Students struggled significantly. Re-teach core concept with slower pacing and one worked example.");

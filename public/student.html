@@ -293,6 +293,35 @@
         word-break: break-all;
       }
 
+      .quiz-section {
+        margin-top: 16px;
+        border-top: 1px solid #e0ddd7;
+        padding-top: 16px;
+        display: none;
+      }
+
+      .quiz-section.visible { display: block; }
+
+      .quiz-title {
+        font-size: 12px;
+        color: #aeaca6;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+        font-weight: 700;
+      }
+
+      .quiz-item {
+        background: #f7f5f0;
+        border: 1px solid #e0ddd7;
+        border-radius: 10px;
+        padding: 10px;
+        font-size: 13px;
+        color: #1a1a18;
+        line-height: 18px;
+        margin-bottom: 8px;
+      }
+
       /* Submitted state */
       #submitted { display: none; text-align: center; padding: 16px 0; }
       .submitted-icon { font-size: 48px; margin-bottom: 12px; }
@@ -491,6 +520,11 @@
         <p class="q-sent" id="qSent">✓ Question sent to teacher!</p>
         <div class="q-error" id="qError"></div>
       </div>
+
+      <div class="quiz-section" id="quizSection">
+        <p class="quiz-title">QUIZ FROM FACULTY</p>
+        <div id="quizQuestions"></div>
+      </div>
     </div>
 
     <!-- SUBMITTED / ROUND CLOSED -->
@@ -556,6 +590,9 @@
       let selectedSig = null;
       let unsubscribe = null;
       let saveTimeout = null;
+      let currentContextRaw = "";
+      let currentContextTopics = [];
+      let currentContextSummary = "";
 
       // ── Nudge state ───────────────────────────────────────────
       const NUDGE_DELAY    = 15;
@@ -657,6 +694,14 @@
         unsubscribe = onSnapshot(doc(db, "sessions", sid), snap => {
           if (!snap.exists()) return;
           const data = snap.data();
+
+          currentContextRaw = typeof data.contextRaw === "string" ? data.contextRaw : "";
+          currentContextTopics = Array.isArray(data.contextTopics)
+            ? data.contextTopics.filter((t) => typeof t === "string")
+            : [];
+          currentContextSummary = typeof data.contextSummary === "string" ? data.contextSummary : "";
+
+          renderStudentQuiz(data.activeQuiz);
 
           if (data.active) {
             hasBeenActive = true;
@@ -788,6 +833,31 @@
         document.getElementById("qSection").classList.remove("visible");
       }
 
+            function renderStudentQuiz(activeQuiz) {
+              const quizSection = document.getElementById("quizSection");
+              const quizQuestions = document.getElementById("quizQuestions");
+
+              const questions = Array.isArray(activeQuiz?.questions)
+                ? activeQuiz.questions
+                : [];
+
+              if (!questions.length) {
+                quizSection.classList.remove("visible");
+                quizQuestions.innerHTML = "";
+                return;
+              }
+
+              quizQuestions.innerHTML = questions
+                .map((q, idx) => {
+                  const text = typeof q === "string" ? q : q?.text;
+                  if (!text) return "";
+                  return `<div class="quiz-item"><strong>Q${idx + 1}:</strong> ${text}</div>`;
+                })
+                .join("");
+
+              quizSection.classList.add("visible");
+            }
+
       function showSaving(state) {
         const row  = document.getElementById("savingRow");
         const text = document.getElementById("savingText");
@@ -829,16 +899,48 @@
         askBtn.textContent = "Sending…";
 
         try {
+          const apiBaseUrl = (window.location.protocol === "file:")
+            ? "http://192.168.0.144:3001"
+            : `${window.location.protocol}//${window.location.hostname}:3001`;
+
+          const validateRes = await fetch(`${apiBaseUrl}/validate-question`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              question: text,
+              contextRaw: currentContextRaw,
+              contextTopics: currentContextTopics,
+              contextSummary: currentContextSummary || currentContextRaw,
+            }),
+          });
+
+          if (!validateRes.ok) {
+            qError.textContent = "Could not validate question right now. Please try again.";
+            qError.style.display = "block";
+            askBtn.disabled = false;
+            askBtn.textContent = "Send question →";
+            return;
+          }
+
+          const validation = await validateRes.json();
+          if (validation?.isRelevant !== true) {
+            qError.textContent = "Question not related to current class context, so it was not sent.";
+            qError.style.display = "block";
+            askBtn.disabled = false;
+            askBtn.textContent = "Send question →";
+            return;
+          }
+
           await addDoc(collection(db, "sessions", sessionId, "questions"), {
             text,
-            upvotes:   0,
-            askedAt:   serverTimestamp(),
+            upvotes: 0,
+            askedAt: serverTimestamp(),
             studentId,
           });
 
           document.getElementById("qSent").style.display = "block";
           askBtn.textContent = "✓ Sent!";
-          input.value        = "";
+          input.value = "";
 
           setTimeout(() => {
             askBtn.disabled    = false;

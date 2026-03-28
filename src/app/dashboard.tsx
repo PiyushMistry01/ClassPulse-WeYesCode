@@ -1,10 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { collection, doc, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Modal,
+    Platform,
     SafeAreaView, ScrollView,
     StyleSheet,
     Text, TouchableOpacity,
@@ -31,6 +33,27 @@ type SessionData = {
   sessionId: string; code: string; sessionName: string;
   teacherName: string; alertThreshold: number; alertMins: number;
 };
+
+type SessionContext = {
+  contextRaw: string;
+  contextTopics: string[];
+  contextSummary: string;
+  contextPurpose: string;
+};
+
+function getQuizApiUrl(): string | null {
+  if (Platform.OS === 'web') {
+    return '/generate-quiz';
+  }
+
+  const base = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+  if (!base) {
+    return null;
+  }
+
+  const normalized = base.endsWith('/') ? base.slice(0, -1) : base;
+  return `${normalized}/generate-quiz`;
+}
 
 async function groupAndFilterQuestions(questions: RawQuestion[], sessionTopic: string): Promise<GroupedQuestion[]> {
   if (questions.length === 0) return [];
@@ -95,6 +118,16 @@ export default function Dashboard() {
   const [secondsLeft, setSecondsLeft]       = useState(15 * 60);
   const [timerRunning, setTimerRunning]     = useState(false);
   const [roundEverStarted, setRoundEverStarted] = useState(false); // ← NEW: tracks if teacher has started at least one round
+  const [sessionContext, setSessionContext] = useState<SessionContext>({
+    contextRaw: '',
+    contextTopics: [],
+    contextSummary: '',
+    contextPurpose: '',
+  });
+  const [quizModalVisible, setQuizModalVisible] = useState(false);
+  const [quizGenerating, setQuizGenerating] = useState(false);
+  const [quizSending, setQuizSending] = useState(false);
+  const [generatedQuiz, setGeneratedQuiz] = useState<string[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastQCount = useRef(0);
 
@@ -169,7 +202,16 @@ export default function Dashboard() {
     if (!session) return;
     const s1 = onSnapshot(doc(db, 'sessions', session.sessionId), snap => {
       if (!snap.exists()) return;
-      setActive(snap.data().active ?? false);
+      const data = snap.data();
+      setActive(data.active ?? false);
+      setSessionContext({
+        contextRaw: typeof data.contextRaw === 'string' ? data.contextRaw : '',
+        contextTopics: Array.isArray(data.contextTopics)
+          ? data.contextTopics.filter((item: unknown): item is string => typeof item === 'string')
+          : [],
+        contextSummary: typeof data.contextSummary === 'string' ? data.contextSummary : '',
+        contextPurpose: typeof data.contextPurpose === 'string' ? data.contextPurpose : '',
+      });
     });
     const s2 = onSnapshot(collection(db, 'sessions', session.sessionId, 'students'), snap => {
       const studs: Record<string, StudentData> = {};
@@ -270,6 +312,97 @@ export default function Dashboard() {
     ]);
   }
 
+  async function handleGenerateQuiz() {
+    if (!session) return;
+
+    if (!sessionContext.contextRaw && !sessionContext.contextSummary && !sessionContext.contextTopics.length) {
+      Alert.alert('Context Required', 'Add teaching context when creating session, then generate quiz.');
+      return;
+    }
+
+    setQuizGenerating(true);
+    try {
+      const apiUrl = getQuizApiUrl();
+      if (!apiUrl) {
+        Alert.alert(
+          'Configuration Required',
+          'Set EXPO_PUBLIC_API_BASE_URL for native builds to enable AI quiz generation.'
+        );
+        return;
+      }
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contextRaw: sessionContext.contextRaw,
+          contextTopics: sessionContext.contextTopics,
+          contextSummary: sessionContext.contextSummary,
+          contextPurpose: sessionContext.contextPurpose,
+        }),
+      });
+
+      if (!response.ok) {
+        let detail = `generate-quiz failed: ${response.status}`;
+        try {
+          const errData = (await response.json()) as { error?: unknown };
+          if (typeof errData.error === 'string' && errData.error.trim()) {
+            detail = errData.error.trim();
+          }
+        } catch {
+          // keep status-based fallback message
+        }
+        throw new Error(detail);
+      }
+
+      const data = (await response.json()) as { questions?: unknown };
+      const questions = Array.isArray(data.questions)
+        ? data.questions.filter((q): q is string => typeof q === 'string').slice(0, 5)
+        : [];
+
+      if (!questions.length) {
+        Alert.alert('No Quiz Generated', 'AI could not generate quiz questions from this context.');
+        return;
+      }
+
+      setGeneratedQuiz(questions);
+      setQuizModalVisible(true);
+    } catch (error) {
+      console.error('Generate quiz failed:', error);
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : 'Could not generate quiz right now. Please try again.';
+      Alert.alert('Generation Failed', message);
+    } finally {
+      setQuizGenerating(false);
+    }
+  }
+
+  async function handleSendQuizToStudents() {
+    if (!session || !generatedQuiz.length) return;
+
+    setQuizSending(true);
+    try {
+      await updateDoc(doc(db, 'sessions', session.sessionId), {
+        activeQuiz: {
+          questions: generatedQuiz.map((text, index) => ({ id: `q${index + 1}`, text })),
+          createdAt: Date.now(),
+          source: 'ai-context',
+        },
+        quizPublishedAt: serverTimestamp(),
+      });
+
+      setQuizModalVisible(false);
+      Alert.alert('Quiz Sent', 'Quiz has been sent to students.');
+    } catch (error) {
+      console.error('Send quiz failed:', error);
+      Alert.alert('Send Failed', 'Could not send quiz to students.');
+    } finally {
+      setQuizSending(false);
+    }
+  }
+
   if (!session) return (
     <SafeAreaView style={s.safe}><View style={s.centered}><Text style={s.muted}>Loading…</Text></View></SafeAreaView>
   );
@@ -289,6 +422,36 @@ export default function Dashboard() {
             </TouchableOpacity>
             <TouchableOpacity style={s.snoozeBtn} onPress={resetTimer}>
               <Text style={s.snoozeBtnText}>Snooze (restart timer)</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={quizModalVisible} transparent animationType="slide" onRequestClose={() => setQuizModalVisible(false)}>
+        <View style={s.overlay}>
+          <View style={s.quizModalCard}>
+            <Text style={s.modalTitle}>AI Quiz Preview</Text>
+            <Text style={s.modalSub}>Review before sending to students</Text>
+
+            <ScrollView style={s.quizList} contentContainerStyle={s.quizListContent}>
+              {generatedQuiz.map((question, index) => (
+                <View key={`${index}-${question}`} style={s.quizQuestionCard}>
+                  <Text style={s.quizQuestionIndex}>Q{index + 1}</Text>
+                  <Text style={s.quizQuestionText}>{question}</Text>
+                </View>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[s.activateBtn, quizSending && s.quizBtnDisabled]}
+              onPress={handleSendQuizToStudents}
+              disabled={quizSending}
+            >
+              <Text style={s.activateBtnText}>{quizSending ? 'Sending…' : 'Send To Students →'}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={s.snoozeBtn} onPress={() => setQuizModalVisible(false)} disabled={quizSending}>
+              <Text style={s.snoozeBtnText}>Close</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -373,6 +536,16 @@ export default function Dashboard() {
           {active ? 'Students can send their signal now' : 'Tap to open — students respond instantly'}
         </Text>
 
+        <TouchableOpacity
+          style={[s.quizBtn, quizGenerating && s.quizBtnDisabled]}
+          onPress={handleGenerateQuiz}
+          disabled={quizGenerating}
+        >
+          {quizGenerating ? <ActivityIndicator color="#F7F5F0" /> : <Text style={s.quizBtnText}>Generate AI Quiz (5 Questions)</Text>}
+        </TouchableOpacity>
+
+        <Text style={s.quizHint}>Quiz is generated from the faculty teaching context and shown before sending.</Text>
+
         {/* Questions */}
         <View style={s.qHeader}>
           <Text style={s.qTitle}>STUDENT QUESTIONS</Text>
@@ -455,6 +628,10 @@ const s = StyleSheet.create({
   roundTextActive:   { color: '#D85A30' },
   roundTextInactive: { color: '#F7F5F0' },
   roundHint:         { fontSize: 12, color: '#AEACA6', textAlign: 'center', marginBottom: 24 },
+  quizBtn:           { backgroundColor: '#215A46', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginBottom: 8 },
+  quizBtnDisabled:   { opacity: 0.65 },
+  quizBtnText:       { color: '#F7F5F0', fontSize: 15, fontWeight: '700' },
+  quizHint:          { fontSize: 12, color: '#888780', textAlign: 'center', marginBottom: 24 },
   qHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   qTitle:  { fontSize: 11, fontWeight: '700', color: '#AEACA6', letterSpacing: 1, textTransform: 'uppercase' },
   qSub:    { fontSize: 11, color: '#AEACA6' },
@@ -478,6 +655,12 @@ const s = StyleSheet.create({
   tagPurpleText: { fontSize: 11, fontWeight: '600', color: '#7B5EA7' },
   overlay:         { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', padding: 28 },
   modalCard:       { backgroundColor: '#fff', borderRadius: 24, padding: 32, width: '100%', alignItems: 'center', gap: 12 },
+  quizModalCard:   { backgroundColor: '#fff', borderRadius: 24, padding: 22, width: '100%', maxHeight: '82%', gap: 10 },
+  quizList:        { maxHeight: 360, width: '100%' },
+  quizListContent: { gap: 8, paddingVertical: 4 },
+  quizQuestionCard:{ backgroundColor: '#F7F5F0', borderRadius: 10, borderWidth: 1, borderColor: '#E0DDD7', padding: 12 },
+  quizQuestionIndex:{ fontSize: 11, color: '#AEACA6', marginBottom: 4, fontWeight: '700' },
+  quizQuestionText:{ fontSize: 14, color: '#1A1A18', lineHeight: 20 },
   modalIcon:       { fontSize: 52 },
   modalTitle:      { fontSize: 26, fontWeight: '700', color: '#1A1A18' },
   modalSub:        { fontSize: 15, color: '#888780', textAlign: 'center', lineHeight: 22 },

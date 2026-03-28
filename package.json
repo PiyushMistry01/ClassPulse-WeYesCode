@@ -8,7 +8,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "server": "node server.js"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -31,7 +32,10 @@
     "expo-symbols": "55.0.6-canary-20260327-0789fbc",
     "expo-system-ui": "55.0.12-canary-20260327-0789fbc",
     "expo-web-browser": "55.0.11-canary-20260327-0789fbc",
+    "express": "^4.21.2",
     "firebase": "^12.11.0",
+    "dotenv": "^16.6.1",
+    "cors": "^2.8.5",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-native": "0.83.4",

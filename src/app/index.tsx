@@ -60,7 +60,13 @@ export default function TeacherSetup() {
       if (normalizedContextRaw) {
         void (async () => {
           try {
-            const res = await fetch('/extract-context', {
+            const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+            if (!apiBaseUrl) {
+              console.warn('EXPO_PUBLIC_API_BASE_URL is missing; skipping context extraction');
+              return;
+            }
+
+            const res = await fetch(`${apiBaseUrl.replace(/\/$/, '')}/extract-context`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ contextRaw: normalizedContextRaw }),
@@ -70,19 +76,21 @@ export default function TeacherSetup() {
               throw new Error(`extract-context failed: ${res.status}`);
             }
 
-            const data = (await res.json()) as { topics?: unknown; summary?: unknown };
+            const data = (await res.json()) as { topics?: unknown; summary?: unknown; purpose?: unknown };
             const topics = Array.isArray(data.topics)
               ? data.topics.filter((item): item is string => typeof item === 'string')
               : [];
             const summary = typeof data.summary === 'string' ? data.summary : '';
+            const purpose = typeof data.purpose === 'string' ? data.purpose : '';
 
-            if (!topics.length && !summary) {
+            if (!topics.length && !summary && !purpose) {
               return;
             }
 
             await updateDoc(doc(db, 'sessions', sessionRef.id), {
               contextTopics: topics,
               contextSummary: summary,
+              contextPurpose: purpose,
             });
           } catch (analysisError) {
             console.warn('Context analysis failed:', analysisError);
