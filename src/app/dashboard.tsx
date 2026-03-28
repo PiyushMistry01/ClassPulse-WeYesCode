@@ -1,104 +1,158 @@
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  SafeAreaView, ScrollView, Alert, Vibration
+  SafeAreaView, ScrollView, Alert, Vibration, Modal
 } from 'react-native';
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'expo-router';
-import { doc, onSnapshot, updateDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, collection } from 'firebase/firestore';
 import { db } from '../firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Signal = 'got_it' | 'sort_of' | 'lost';
+type StudentData = { signal: Signal };
 
-type StudentData = {
-  signal: Signal;
+type RawQuestion = {
+  id: string; text: string; upvotes: number; studentId: string; askedAt: any;
 };
 
-type Question = {
-  id: string;
-  text: string;
-  upvotes: number;
+type GroupedQuestion = {
+  representativeText: string; count: number; upvotes: number; priority: number; ids: string[];
 };
 
 type SessionData = {
-  sessionId: string;
-  code: string;
-  sessionName: string;
-  teacherName: string;
-  alertThreshold: number;
+  sessionId: string; code: string; sessionName: string;
+  teacherName: string; alertThreshold: number; alertMins: number;
 };
+
+async function groupAndFilterQuestions(questions: RawQuestion[], sessionTopic: string): Promise<GroupedQuestion[]> {
+  if (questions.length === 0) return [];
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: `You are helping a teacher manage student questions during a class on: "${sessionTopic}".
+
+Here are the student questions (JSON):
+${JSON.stringify(questions.map(q => ({ id: q.id, text: q.text, upvotes: q.upvotes })))}
+
+Your tasks:
+1. DISCARD any questions NOT related to "${sessionTopic}" — silently remove them.
+2. GROUP questions that share the same concept or keywords together.
+3. For each group, pick the CLEAREST and most complete question as the representative.
+4. Calculate priority = (number of similar questions * 2) + upvotes.
+5. Sort by priority DESCENDING — highest priority FIRST (position #1 in queue).
+
+Rules:
+- If only 1 question in a group, count = 1.
+- Never invent questions. Only use what students actually asked.
+- Discard greetings, random text, or anything unrelated to the topic.
+
+Respond ONLY with a valid JSON array. No markdown, no explanation:
+[{"representativeText":"...","count":2,"upvotes":3,"priority":7,"ids":["id1","id2"]}]`
+        }]
+      })
+    });
+    const data  = await response.json();
+    const raw   = data.content?.find((c: any) => c.type === 'text')?.text || '[]';
+    const clean = raw.replace(/```json|```/g, '').trim();
+    return JSON.parse(clean) as GroupedQuestion[];
+  } catch (e) {
+    console.error('AI grouping failed:', e);
+    return questions.map(q => ({
+      representativeText: q.text, count: 1,
+      upvotes: q.upvotes || 0, priority: q.upvotes || 0, ids: [q.id],
+    })).sort((a, b) => b.priority - a.priority);
+  }
+}
 
 export default function Dashboard() {
   const router = useRouter();
-  const [session, setSession]     = useState<SessionData | null>(null);
-  const [active, setActive]       = useState(false);
-  const [students, setStudents]   = useState<Record<string, StudentData>>({});
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [alertShown, setAlertShown] = useState(false);
-  const unsubRef = useRef<(() => void) | null>(null);
+  const [session, setSession]               = useState<SessionData | null>(null);
+  const [active, setActive]                 = useState(false);
+  const [students, setStudents]             = useState<Record<string, StudentData>>({});
+  const [rawQuestions, setRawQuestions]     = useState<RawQuestion[]>([]);
+  const [groupedQs, setGroupedQs]           = useState<GroupedQuestion[]>([]);
+  const [alertShown, setAlertShown]         = useState(false);
+  const [showTimerAlert, setShowTimerAlert] = useState(false);
+  const [processing, setProcessing]         = useState(false);
+  const [secondsLeft, setSecondsLeft]       = useState(15 * 60);
+  const [timerRunning, setTimerRunning]     = useState(true);
+  const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastQCount = useRef(0);
 
-  // Load session from AsyncStorage
   useEffect(() => {
     AsyncStorage.getItem('currentSession').then(raw => {
       if (!raw) { router.replace('/'); return; }
       const s = JSON.parse(raw);
-      setSession({ ...s, alertThreshold: parseInt(s.alertThreshold) });
+      const mins = parseInt(s.alertMins) || 15;
+      setSession({ ...s, alertThreshold: parseInt(s.alertThreshold), alertMins: mins });
+      setSecondsLeft(mins * 60);
     });
   }, []);
 
-  // Listen to Firestore
+  useEffect(() => {
+    if (!session || !timerRunning) return;
+    timerRef.current = setInterval(() => {
+      setSecondsLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          setTimerRunning(false);
+          Vibration.vibrate([0, 500, 200, 500, 200, 500]);
+          setShowTimerAlert(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timerRef.current!);
+  }, [session, timerRunning]);
+
+  function resetTimer() {
+    clearInterval(timerRef.current!);
+    setSecondsLeft((session?.alertMins || 15) * 60);
+    setTimerRunning(true);
+    setShowTimerAlert(false);
+  }
+
   useEffect(() => {
     if (!session) return;
-
-    unsubRef.current = onSnapshot(doc(db, 'sessions', session.sessionId), snap => {
+    const s1 = onSnapshot(doc(db, 'sessions', session.sessionId), snap => {
       if (!snap.exists()) return;
-      const data = snap.data();
-      setActive(data.active ?? false);
-
-      // Students subcollection signals
+      setActive(snap.data().active ?? false);
+    });
+    const s2 = onSnapshot(collection(db, 'sessions', session.sessionId, 'students'), snap => {
       const studs: Record<string, StudentData> = {};
-      if (data.students) {
-        Object.entries(data.students).forEach(([k, v]: any) => {
-          studs[k] = v;
-        });
-      }
+      snap.forEach(d => { studs[d.id] = d.data() as StudentData; });
       setStudents(studs);
     });
-
-    // Listen to questions subcollection
-    const qUnsub = onSnapshot(
-      collection(db, 'sessions', session.sessionId, 'students'),
-      snap => {
-        const studs: Record<string, StudentData> = {};
-        snap.forEach(d => { studs[d.id] = d.data() as StudentData; });
-        setStudents(studs);
-      }
-    );
-
-    const questUnsub = onSnapshot(
-      collection(db, 'sessions', session.sessionId, 'questions'),
-      snap => {
-        const qs: Question[] = [];
-        snap.forEach(d => qs.push({ id: d.id, ...d.data() } as Question));
-        qs.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0));
-        setQuestions(qs);
-      }
-    );
-
-    return () => {
-      unsubRef.current?.();
-      qUnsub();
-      questUnsub();
-    };
+    const s3 = onSnapshot(collection(db, 'sessions', session.sessionId, 'questions'), snap => {
+      const qs: RawQuestion[] = [];
+      snap.forEach(d => qs.push({ id: d.id, ...d.data() } as RawQuestion));
+      setRawQuestions(qs);
+    });
+    return () => { s1(); s2(); s3(); };
   }, [session]);
 
-  // Alert when lost % exceeds threshold
+  useEffect(() => {
+    if (!session || rawQuestions.length === 0) { setGroupedQs([]); return; }
+    if (rawQuestions.length === lastQCount.current) return;
+    lastQCount.current = rawQuestions.length;
+    setProcessing(true);
+    groupAndFilterQuestions(rawQuestions, session.sessionName)
+      .then(setGroupedQs)
+      .finally(() => setProcessing(false));
+  }, [rawQuestions.length]);
+
   useEffect(() => {
     if (!session || !active) return;
     const total = Object.keys(students).length;
     if (total === 0) return;
-    const lostCount = Object.values(students).filter(s => s.signal === 'lost').length;
-    const lostPct = Math.round(lostCount / total * 100);
+    const lostPct = Math.round(Object.values(students).filter(s => s.signal === 'lost').length / total * 100);
     if (lostPct >= session.alertThreshold && !alertShown) {
       Vibration.vibrate([0, 400, 200, 400]);
       setAlertShown(true);
@@ -111,77 +165,105 @@ export default function Dashboard() {
     sort: Object.values(students).filter(s => s.signal === 'sort_of').length,
     lost: Object.values(students).filter(s => s.signal === 'lost').length,
   };
-  const total = Object.keys(students).length;
+  const total   = Object.keys(students).length;
   const lostPct = total > 0 ? Math.round(counts.lost / total * 100) : 0;
   const isAlert = session && lostPct >= session.alertThreshold && total > 0;
+  const mm      = Math.floor(secondsLeft / 60).toString().padStart(2, '0');
+  const ss      = (secondsLeft % 60).toString().padStart(2, '0');
+  const tColor  = secondsLeft <= 60 ? '#D85A30' : secondsLeft <= 180 ? '#C48A00' : '#1A1A18';
 
   async function toggleRound() {
     if (!session) return;
-    await updateDoc(doc(db, 'sessions', session.sessionId), {
-      active: !active,
-    });
+    await updateDoc(doc(db, 'sessions', session.sessionId), { active: !active });
+    if (!active) resetTimer();
+  }
+
+  async function activateNow() {
+    if (!session) return;
+    await updateDoc(doc(db, 'sessions', session.sessionId), { active: true });
+    setShowTimerAlert(false);
+    resetTimer();
   }
 
   async function endSession() {
     Alert.alert('End Session?', 'This will close the session for all students.', [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'End', style: 'destructive', onPress: async () => {
-          if (!session) return;
-          await updateDoc(doc(db, 'sessions', session.sessionId), {
-            active: false,
-            ended: true,
-          });
-          await AsyncStorage.removeItem('currentSession');
-          router.replace('/');
-        }
-      }
+      { text: 'End', style: 'destructive', onPress: async () => {
+        if (!session) return;
+        await updateDoc(doc(db, 'sessions', session.sessionId), { active: false, ended: true });
+        await AsyncStorage.removeItem('currentSession');
+        router.replace('/');
+      }}
     ]);
   }
 
-  if (!session) {
-    return (
-      <SafeAreaView style={s.safe}>
-        <View style={s.centered}>
-          <Text style={s.muted}>Loading…</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  if (!session) return (
+    <SafeAreaView style={s.safe}><View style={s.centered}><Text style={s.muted}>Loading…</Text></View></SafeAreaView>
+  );
 
   return (
     <SafeAreaView style={s.safe}>
+
+      {/* Timer Alert Modal */}
+      <Modal visible={showTimerAlert} transparent animationType="fade">
+        <View style={s.overlay}>
+          <View style={s.modalCard}>
+            <Text style={s.modalIcon}>⏰</Text>
+            <Text style={s.modalTitle}>Time's up!</Text>
+            <Text style={s.modalSub}>{session.alertMins} minutes have passed.{'\n'}Activate round for students?</Text>
+            <TouchableOpacity style={s.activateBtn} onPress={activateNow}>
+              <Text style={s.activateBtnText}>Activate Round Now →</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.snoozeBtn} onPress={resetTimer}>
+              <Text style={s.snoozeBtnText}>Snooze (restart timer)</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <ScrollView contentContainerStyle={s.scroll}>
 
         {/* Header */}
         <View style={s.header}>
-          <View>
-            <Text style={s.badge}>LIVE</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={s.liveBadge}>● LIVE</Text>
             <Text style={s.title}>{session.sessionName}</Text>
-            <Text style={s.sub}>Code: {session.code}</Text>
+            <Text style={s.sub}>Code {session.code} · {session.teacherName}</Text>
           </View>
           <TouchableOpacity style={s.endBtn} onPress={endSession}>
             <Text style={s.endBtnText}>End</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Alert banner */}
+        {/* Timer */}
+        <View style={s.timerCard}>
+          <View>
+            <Text style={s.timerLabel}>NEXT CHECK-IN</Text>
+            <Text style={[s.timerValue, { color: tColor }]}>{mm}:{ss}</Text>
+          </View>
+          <View style={s.timerRight}>
+            <Text style={s.timerHint}>Every {session.alertMins} min</Text>
+            <TouchableOpacity style={s.resetBtn} onPress={resetTimer}>
+              <Text style={s.resetBtnText}>↺ Reset</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Lost alert */}
         {isAlert && (
           <View style={s.alertBanner}>
-            <Text style={s.alertText}>⚠️ {lostPct}% of students are lost!</Text>
+            <Text style={s.alertText}>⚠️  {lostPct}% of students are lost!</Text>
           </View>
         )}
 
         {/* Stats */}
         <View style={s.statsRow}>
-          <StatCard label="Got it"  count={counts.got}  pct={total > 0 ? Math.round(counts.got/total*100) : 0}  color="#1D9E75" bg="#E1F5EE" />
+          <StatCard label="Got it"  count={counts.got}  pct={total > 0 ? Math.round(counts.got/total*100)  : 0} color="#1D9E75" bg="#E1F5EE" />
           <StatCard label="Sort of" count={counts.sort} pct={total > 0 ? Math.round(counts.sort/total*100) : 0} color="#C48A00" bg="#FDF3DC" />
-          <StatCard label="Lost"    count={counts.lost} pct={lostPct}                                             color="#D85A30" bg="#FDECEA" />
+          <StatCard label="Lost"    count={counts.lost} pct={lostPct} color="#D85A30" bg="#FDECEA" />
         </View>
-
         <Text style={s.totalText}>{total} student{total !== 1 ? 's' : ''} responded</Text>
 
-        {/* Progress bar */}
         {total > 0 && (
           <View style={s.barTrack}>
             <View style={[s.barSeg, { flex: counts.got,  backgroundColor: '#1D9E75' }]} />
@@ -190,94 +272,133 @@ export default function Dashboard() {
           </View>
         )}
 
-        {/* Round control */}
-        <TouchableOpacity
-          style={[s.roundBtn, active ? s.roundBtnActive : s.roundBtnInactive]}
-          onPress={toggleRound}
-        >
-          <Text style={[s.roundBtnText, active ? s.roundBtnTextActive : s.roundBtnTextInactive]}>
-            {active ? 'Close Round' : 'Start Round →'}
+        {/* Round button */}
+        <TouchableOpacity style={[s.roundBtn, active ? s.roundActive : s.roundInactive]} onPress={toggleRound}>
+          <Text style={[s.roundText, active ? s.roundTextActive : s.roundTextInactive]}>
+            {active ? '⏹  Close Round' : '▶  Start Round'}
           </Text>
         </TouchableOpacity>
-
         <Text style={s.roundHint}>
-          {active
-            ? 'Students can now send their signal'
-            : 'Tap to open round — students will respond instantly'}
+          {active ? 'Students can send their signal now' : 'Tap to open — students respond instantly'}
         </Text>
 
         {/* Questions */}
-        {questions.length > 0 && (
-          <>
-            <Text style={s.sectionTitle}>Student questions</Text>
-            {questions.map(q => (
-              <View key={q.id} style={s.qCard}>
-                <Text style={s.qText}>{q.text}</Text>
-                <Text style={s.qUpvotes}>👍 {q.upvotes || 0}</Text>
-              </View>
-            ))}
-          </>
+        <View style={s.qHeader}>
+          <Text style={s.qTitle}>STUDENT QUESTIONS</Text>
+          <Text style={s.qSub}>
+            {processing ? '🤖 AI analyzing…' : groupedQs.length > 0 ? `${groupedQs.length} group${groupedQs.length !== 1 ? 's' : ''}` : ''}
+          </Text>
+        </View>
+
+        {groupedQs.length === 0 && !processing && (
+          <View style={s.emptyBox}>
+            <Text style={s.emptyText}>No questions yet</Text>
+            <Text style={s.emptyHint}>Students can ask questions during an active round</Text>
+          </View>
         )}
+
+        {groupedQs.map((q, i) => (
+          <View key={i} style={[s.qCard, i === 0 && s.qCardTop]}>
+            <View style={[s.rankBox, i === 0 && s.rankBoxTop]}>
+              <Text style={[s.rankText, i === 0 && s.rankTextTop]}>#{i + 1}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              {i === 0 && <Text style={s.topLabel}>🔥 Highest Priority</Text>}
+              <Text style={s.qText}>{q.representativeText}</Text>
+              <View style={s.qTags}>
+                {q.count > 1 && (
+                  <View style={s.tagGreen}><Text style={s.tagGreenText}>👥 {q.count} students asked this</Text></View>
+                )}
+                {q.upvotes > 0 && (
+                  <View style={s.tagYellow}><Text style={s.tagYellowText}>👍 {q.upvotes} upvotes</Text></View>
+                )}
+                <View style={s.tagPurple}><Text style={s.tagPurpleText}>⚡ priority {q.priority}</Text></View>
+              </View>
+            </View>
+          </View>
+        ))}
 
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function StatCard({ label, count, pct, color, bg }: {
-  label: string; count: number; pct: number; color: string; bg: string;
-}) {
+function StatCard({ label, count, pct, color, bg }: { label: string; count: number; pct: number; color: string; bg: string; }) {
   return (
     <View style={[sc.card, { backgroundColor: bg }]}>
-      <Text style={[sc.count, { color }]}>{count}</Text>
-      <Text style={[sc.label, { color }]}>{label}</Text>
+      <Text style={[sc.num, { color }]}>{count}</Text>
+      <Text style={[sc.lbl, { color }]}>{label}</Text>
       <Text style={[sc.pct, { color }]}>{pct}%</Text>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  safe:    { flex: 1, backgroundColor: '#F7F5F0' },
-  scroll:  { padding: 24, paddingBottom: 40 },
-  centered:{ flex: 1, justifyContent: 'center', alignItems: 'center' },
-  muted:   { fontSize: 15, color: '#888780' },
-
-  header:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, marginTop: 8 },
-  badge:   { fontSize: 11, letterSpacing: 2.5, color: '#D85A30', fontWeight: '600', marginBottom: 4 },
-  title:   { fontSize: 22, fontWeight: '600', color: '#1A1A18', letterSpacing: -0.3 },
-  sub:     { fontSize: 13, color: '#888780', marginTop: 2 },
-
-  endBtn:     { backgroundColor: '#FDECEA', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8 },
-  endBtnText: { fontSize: 14, fontWeight: '600', color: '#D85A30' },
-
-  alertBanner: { backgroundColor: '#D85A30', borderRadius: 12, padding: 14, marginBottom: 16 },
-  alertText:   { color: '#fff', fontSize: 15, fontWeight: '600', textAlign: 'center' },
-
-  statsRow:  { flexDirection: 'row', gap: 10, marginBottom: 10 },
-  totalText: { fontSize: 13, color: '#888780', textAlign: 'center', marginBottom: 12 },
-
-  barTrack: { flexDirection: 'row', height: 10, borderRadius: 5, overflow: 'hidden', marginBottom: 24, backgroundColor: '#E0DDD7' },
-  barSeg:   { height: '100%' },
-
-  roundBtn: { borderRadius: 14, paddingVertical: 18, alignItems: 'center', marginBottom: 8 },
-  roundBtnActive:   { backgroundColor: '#FDECEA', borderWidth: 1.5, borderColor: '#D85A30' },
-  roundBtnInactive: { backgroundColor: '#1A1A18' },
-  roundBtnText: { fontSize: 16, fontWeight: '600' },
-  roundBtnTextActive:   { color: '#D85A30' },
-  roundBtnTextInactive: { color: '#F7F5F0' },
-
-  roundHint: { fontSize: 12, color: '#AEACA6', textAlign: 'center', marginBottom: 28 },
-
-  sectionTitle: { fontSize: 12, fontWeight: '700', color: '#AEACA6', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 },
-
-  qCard:    { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: '#E0DDD7', flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
-  qText:    { flex: 1, fontSize: 14, color: '#1A1A18', lineHeight: 20 },
-  qUpvotes: { fontSize: 12, color: '#888780' },
+  safe:     { flex: 1, backgroundColor: '#F7F5F0' },
+  scroll:   { padding: 24, paddingBottom: 48 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  muted:    { fontSize: 15, color: '#888780' },
+  header:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, marginTop: 4 },
+  liveBadge:  { fontSize: 11, letterSpacing: 2, color: '#D85A30', fontWeight: '700', marginBottom: 4 },
+  title:      { fontSize: 20, fontWeight: '700', color: '#1A1A18', letterSpacing: -0.3 },
+  sub:        { fontSize: 12, color: '#888780', marginTop: 2 },
+  endBtn:     { backgroundColor: '#FDECEA', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
+  endBtnText: { fontSize: 13, fontWeight: '600', color: '#D85A30' },
+  timerCard:    { backgroundColor: '#fff', borderRadius: 16, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, borderWidth: 1, borderColor: '#E0DDD7' },
+  timerLabel:   { fontSize: 10, letterSpacing: 1.5, color: '#AEACA6', fontWeight: '600', marginBottom: 2 },
+  timerValue:   { fontSize: 42, fontWeight: '700', letterSpacing: -1 },
+  timerRight:   { alignItems: 'flex-end', gap: 8 },
+  timerHint:    { fontSize: 12, color: '#888780' },
+  resetBtn:     { backgroundColor: '#F7F5F0', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#E0DDD7' },
+  resetBtnText: { fontSize: 13, color: '#444441', fontWeight: '500' },
+  alertBanner: { backgroundColor: '#D85A30', borderRadius: 12, padding: 12, marginBottom: 14 },
+  alertText:   { color: '#fff', fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  statsRow:  { flexDirection: 'row', gap: 10, marginBottom: 8 },
+  totalText: { fontSize: 12, color: '#888780', textAlign: 'center', marginBottom: 10 },
+  barTrack:  { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 20, backgroundColor: '#E0DDD7' },
+  barSeg:    { height: '100%' },
+  roundBtn:          { borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginBottom: 6 },
+  roundActive:       { backgroundColor: '#FDECEA', borderWidth: 1.5, borderColor: '#D85A30' },
+  roundInactive:     { backgroundColor: '#1A1A18' },
+  roundText:         { fontSize: 16, fontWeight: '700' },
+  roundTextActive:   { color: '#D85A30' },
+  roundTextInactive: { color: '#F7F5F0' },
+  roundHint:         { fontSize: 12, color: '#AEACA6', textAlign: 'center', marginBottom: 24 },
+  qHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  qTitle:  { fontSize: 11, fontWeight: '700', color: '#AEACA6', letterSpacing: 1, textTransform: 'uppercase' },
+  qSub:    { fontSize: 11, color: '#AEACA6' },
+  emptyBox:  { backgroundColor: '#fff', borderRadius: 12, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: '#E0DDD7' },
+  emptyText: { fontSize: 14, color: '#AEACA6', fontWeight: '500' },
+  emptyHint: { fontSize: 12, color: '#C8C5BE', marginTop: 4, textAlign: 'center' },
+  qCard:      { backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, flexDirection: 'row', gap: 12, borderWidth: 1, borderColor: '#E0DDD7' },
+  qCardTop:   { borderColor: '#7B5EA7', borderWidth: 2 },
+  rankBox:    { width: 34, height: 34, borderRadius: 8, backgroundColor: '#F7F5F0', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E0DDD7' },
+  rankBoxTop: { backgroundColor: '#F0EDF8', borderColor: '#7B5EA7' },
+  rankText:   { fontSize: 12, fontWeight: '700', color: '#888780' },
+  rankTextTop:{ color: '#7B5EA7' },
+  topLabel:   { fontSize: 11, fontWeight: '700', color: '#7B5EA7', marginBottom: 4, letterSpacing: 0.3 },
+  qText:      { fontSize: 14, color: '#1A1A18', lineHeight: 20, fontWeight: '500', marginBottom: 8 },
+  qTags:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  tagGreen:      { backgroundColor: '#E1F5EE', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  tagGreenText:  { fontSize: 11, fontWeight: '600', color: '#1D9E75' },
+  tagYellow:     { backgroundColor: '#FDF3DC', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  tagYellowText: { fontSize: 11, fontWeight: '600', color: '#C48A00' },
+  tagPurple:     { backgroundColor: '#F0EDF8', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  tagPurpleText: { fontSize: 11, fontWeight: '600', color: '#7B5EA7' },
+  overlay:         { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', padding: 28 },
+  modalCard:       { backgroundColor: '#fff', borderRadius: 24, padding: 32, width: '100%', alignItems: 'center', gap: 12 },
+  modalIcon:       { fontSize: 52 },
+  modalTitle:      { fontSize: 26, fontWeight: '700', color: '#1A1A18' },
+  modalSub:        { fontSize: 15, color: '#888780', textAlign: 'center', lineHeight: 22 },
+  activateBtn:     { backgroundColor: '#1A1A18', borderRadius: 14, paddingVertical: 16, width: '100%', alignItems: 'center', marginTop: 8 },
+  activateBtnText: { color: '#F7F5F0', fontSize: 16, fontWeight: '700' },
+  snoozeBtn:       { borderWidth: 1.5, borderColor: '#E0DDD7', borderRadius: 14, paddingVertical: 14, width: '100%', alignItems: 'center' },
+  snoozeBtnText:   { color: '#888780', fontSize: 14, fontWeight: '500' },
 });
 
 const sc = StyleSheet.create({
-  card:  { flex: 1, borderRadius: 14, padding: 14, alignItems: 'center' },
-  count: { fontSize: 32, fontWeight: '700' },
-  label: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', marginTop: 2 },
-  pct:   { fontSize: 14, fontWeight: '700', marginTop: 2 },
+  card: { flex: 1, borderRadius: 14, padding: 14, alignItems: 'center' },
+  num:  { fontSize: 30, fontWeight: '700' },
+  lbl:  { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', marginTop: 2 },
+  pct:  { fontSize: 13, fontWeight: '700', marginTop: 2 },
 });
