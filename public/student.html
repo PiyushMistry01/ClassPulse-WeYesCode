@@ -376,7 +376,7 @@
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
   import {
     getFirestore, collection, query, where, getDocs,
-    doc, setDoc, addDoc, onSnapshot, serverTimestamp
+    doc, getDoc, setDoc, addDoc, onSnapshot, serverTimestamp
   } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
   // ── Firebase config (same project as teacher app) ──
@@ -407,35 +407,75 @@
   studentId = sessionStorage.getItem('studentId') || genStudentId();
   sessionStorage.setItem('studentId', studentId);
 
-  // ── Expose to global scope ──
-  window.joinSession = async function () {
-    const code = document.getElementById('codeInput').value.trim();
+  // ── Connect to session (extracted for reuse) ──
+  async function connectToSession(sessionIdOrCode, isDirectId = false) {
     const errEl = document.getElementById('joinError');
     errEl.style.display = 'none';
 
-    if (code.length !== 4 || isNaN(code)) {
-      errEl.textContent = 'Please enter a valid 4-digit code.';
-      errEl.style.display = 'block';
-      return;
-    }
-
-    document.getElementById('joinBtn').disabled = true;
-    document.getElementById('joinBtn').textContent = 'Joining…';
-
-    try {
-      // Find session by code
+    const findByCode = async (code) => {
       const q = query(collection(db, 'sessions'), where('code', '==', code));
       const snap = await getDocs(q);
+      return snap.empty ? null : snap.docs[0];
+    };
 
-      if (snap.empty) {
-        errEl.textContent = 'Code not found. Check with your teacher.';
-        errEl.style.display = 'block';
-        document.getElementById('joinBtn').disabled = false;
-        document.getElementById('joinBtn').textContent = 'Join →';
-        return;
+    const findByIdWithListFallback = async (id) => {
+      const cleanId = String(id).trim();
+
+      // First attempt: direct doc read
+      try {
+        const directSnap = await getDoc(doc(db, 'sessions', cleanId));
+        if (directSnap.exists()) {
+          return {
+            id: directSnap.id,
+            data: () => directSnap.data(),
+          };
+        }
+      } catch (_) {
+        // Some Firestore rules allow list/query but not direct get.
       }
 
-      const sessionDoc = snap.docs[0];
+      // Fallback: query all docs and match by id
+      try {
+        const allSnap = await getDocs(collection(db, 'sessions'));
+        return allSnap.docs.find((d) => d.id === cleanId) || null;
+      } catch (_) {
+        return null;
+      }
+    };
+
+    try {
+      let sessionDoc;
+
+      if (isDirectId) {
+        // Direct session ID from URL (QR code)
+        const directId = String(sessionIdOrCode).trim();
+        sessionDoc = await findByIdWithListFallback(directId);
+
+        // Backward compatibility: if QR/session param is a 4-digit code, use existing code lookup.
+        if (!sessionDoc && directId.length === 4 && !isNaN(directId)) {
+          sessionDoc = await findByCode(directId);
+        }
+
+        if (!sessionDoc) {
+          errEl.textContent = 'Session not found. Try scanning the QR code again.';
+          errEl.style.display = 'block';
+          return;
+        }
+      } else {
+        // Look up by 4-digit code (manual entry)
+        if (sessionIdOrCode.length !== 4 || isNaN(sessionIdOrCode)) {
+          errEl.textContent = 'Please enter a valid 4-digit code.';
+          errEl.style.display = 'block';
+          return;
+        }
+        sessionDoc = await findByCode(sessionIdOrCode);
+        if (!sessionDoc) {
+          errEl.textContent = 'Code not found. Check with your teacher.';
+          errEl.style.display = 'block';
+          return;
+        }
+      }
+
       sessionId = sessionDoc.id;
       const data = sessionDoc.data();
 
@@ -448,19 +488,59 @@
       `;
       document.getElementById('sessionNameLabel').textContent = data.sessionName;
 
-      // Switch screens
+      // Switch screens immediately so the user sees progress.
       document.getElementById('joinScreen').style.display = 'none';
+      document.getElementById('waiting').style.display = 'block';
+
+      // Keep URL in sync so refresh/deep-link works after manual join.
+      const nextUrl = `${window.location.pathname}?session=${encodeURIComponent(sessionId)}`;
+      window.history.replaceState({}, '', nextUrl);
 
       // Listen for active state
       listenToSession(sessionId);
 
     } catch (e) {
+      console.error('Connection error:', e);
       errEl.textContent = 'Connection error. Try again.';
       errEl.style.display = 'block';
-      document.getElementById('joinBtn').disabled = false;
-      document.getElementById('joinBtn').textContent = 'Join →';
+    }
+  }
+
+  // ── Manual join from form submission ──
+  window.joinSession = async function () {
+    const code = document.getElementById('codeInput').value.trim();
+    const joinBtn = document.getElementById('joinBtn');
+
+    joinBtn.disabled = true;
+    joinBtn.textContent = 'Joining…';
+
+    await connectToSession(code, false);
+
+    // Re-enable button if connection failed
+    const errEl = document.getElementById('joinError');
+    if (errEl.style.display !== 'none') {
+      joinBtn.disabled = false;
+      joinBtn.textContent = 'Join →';
     }
   };
+
+  // ── Auto-connect from URL query param on page load ──
+  window.addEventListener('load', async function() {
+    const params = new URLSearchParams(window.location.search);
+    const sessionFromUrl = params.get('session');
+
+    if (sessionFromUrl && sessionFromUrl.trim()) {
+      // Show connecting state
+      const joinBtn = document.getElementById('joinBtn');
+      const codeInput = document.getElementById('codeInput');
+      joinBtn.textContent = 'Connecting…';
+      joinBtn.disabled = true;
+      codeInput.disabled = true;
+
+      // Auto-connect using the session ID from URL
+      await connectToSession(sessionFromUrl, true);
+    }
+  });
 
   function listenToSession(sid) {
     if (unsubscribe) unsubscribe();

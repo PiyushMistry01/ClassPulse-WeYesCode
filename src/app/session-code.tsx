@@ -23,6 +23,9 @@ export default function SessionCode() {
   const [params, setParams] = useState<SessionParams | null>(null);
   const [activating, setActivating] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const studentUrl = params
+    ? `https://classpulse-5a552.web.app/student.html?session=${encodeURIComponent(params.sessionId)}`
+    : '';
 
   useEffect(() => {
   let retries = 0;
@@ -56,7 +59,7 @@ export default function SessionCode() {
   const handleShare = async () => {
     if (!params) return;
     await Share.share({
-      message: `Join my class!\nCode: ${params.code}`,
+      message: `Join my class!\nScan the QR or open: ${studentUrl}\nCode: ${params.code}`,
     });
   };
 
@@ -114,7 +117,7 @@ export default function SessionCode() {
         {/* QR Code card */}
         <View style={styles.qrCard}>
           <QRCode
-            value={params!.code}
+            value={studentUrl}
             size={180}
             color="#1A1A18"
             backgroundColor="#FFFFFF"
