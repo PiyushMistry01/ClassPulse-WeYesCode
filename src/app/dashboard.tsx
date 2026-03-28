@@ -144,14 +144,20 @@ export default function Dashboard() {
   }, [session]);
 
   useEffect(() => {
-    if (!session || rawQuestions.length === 0) { setGroupedQs([]); return; }
-    if (rawQuestions.length === lastQCount.current) return;
-    lastQCount.current = rawQuestions.length;
-    setProcessing(true);
-    groupAndFilterQuestions(rawQuestions, session.sessionName)
-      .then(setGroupedQs)
-      .finally(() => setProcessing(false));
-  }, [rawQuestions.length]);
+  if (!session || rawQuestions.length === 0) { setGroupedQs([]); return; }
+  if (rawQuestions.length === lastQCount.current) return;
+  lastQCount.current = rawQuestions.length;
+
+  // Bypass AI — show raw questions directly
+  const raw = rawQuestions.map(q => ({
+    representativeText: q.text,
+    count: 1,
+    upvotes: q.upvotes || 0,
+    priority: 1,
+    ids: [q.id],
+  }));
+  setGroupedQs(raw);
+}, [rawQuestions.length]);
 
   useEffect(() => {
     if (!session || !active) return;
