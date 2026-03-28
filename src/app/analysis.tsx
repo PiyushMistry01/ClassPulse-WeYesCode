@@ -1,22 +1,22 @@
-import {
-  ActivityIndicator,
-  Alert,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  LayoutChangeEvent,
-  Platform,
-} from 'react-native';
-import { useEffect, useMemo, useState } from 'react';
-import { useLocalSearchParams } from 'expo-router';
-import { collection, doc, getDoc, getDocs, Timestamp } from 'firebase/firestore';
-import Svg, { Circle, G, Line, Polyline, Text as SvgText } from 'react-native-svg';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
+import * as Print from 'expo-print';
+import { useLocalSearchParams } from 'expo-router';
+import * as Sharing from 'expo-sharing';
+import { collection, doc, getDoc, getDocs, Timestamp } from 'firebase/firestore';
+import { useEffect, useMemo, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    LayoutChangeEvent,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import Svg, { Circle, G, Line, Polyline, Text as SvgText } from 'react-native-svg';
 import { db } from '../firebase';
 
 type Signal = 'got_it' | 'sort_of' | 'lost';

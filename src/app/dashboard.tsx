@@ -1,12 +1,17 @@
-import {
-  View, Text, TouchableOpacity, StyleSheet,
-  SafeAreaView, ScrollView, Alert, Vibration, Modal
-} from 'react-native';
-import { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'expo-router';
-import { doc, onSnapshot, updateDoc, collection } from 'firebase/firestore';
-import { db } from '../firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { useEffect, useRef, useState } from 'react';
+import {
+    Alert,
+    Modal,
+    SafeAreaView, ScrollView,
+    StyleSheet,
+    Text, TouchableOpacity,
+    Vibration,
+    View
+} from 'react-native';
+import { db } from '../firebase';
 
 type Signal = 'got_it' | 'sort_of' | 'lost';
 type StudentData = { signal: Signal };
