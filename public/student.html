@@ -51,7 +51,7 @@
         line-height: 20px;
       }
 
-      input {
+      input[type="tel"] {
         width: 100%;
         background: #f7f5f0;
         border: 1.5px solid #e0ddd7;
@@ -67,7 +67,7 @@
         transition: border-color 0.2s;
       }
 
-      input:focus { border-color: #1a1a18; }
+      input[type="tel"]:focus { border-color: #1a1a18; }
 
       .join-btn {
         width: 100%;
@@ -83,7 +83,7 @@
         transition: opacity 0.2s;
       }
 
-      .join-btn:hover { opacity: 0.85; }
+      .join-btn:hover   { opacity: 0.85; }
       .join-btn:disabled { background: #888780; cursor: not-allowed; }
 
       .error {
@@ -96,7 +96,7 @@
         display: none;
       }
 
-      /* ── Waiting room ── */
+      /* Waiting room */
       #waiting { display: none; text-align: center; }
 
       .session-info {
@@ -143,10 +143,10 @@
         50%       { opacity: 0.4; transform: scale(0.8); }
       }
 
-      /* ── Active round ── */
+      /* Active round */
       #active { display: none; }
 
-      .round-header { text-align: center; margin-bottom: 24px; }
+      .round-header { text-align: center; margin-bottom: 28px; }
       .round-title  { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
       .round-sub    { font-size: 13px; color: #888780; }
 
@@ -154,11 +154,11 @@
         display: flex;
         flex-direction: column;
         gap: 12px;
-        margin-bottom: 24px;
+        margin-bottom: 8px;
       }
 
       .signal-btn {
-        border: none;
+        border: 2px solid transparent;
         border-radius: 16px;
         padding: 20px 16px;
         font-size: 18px;
@@ -167,46 +167,73 @@
         display: flex;
         align-items: center;
         gap: 14px;
-        transition: transform 0.15s, opacity 0.15s;
+        transition: transform 0.15s, border-color 0.15s, opacity 0.15s;
+        width: 100%;
+        text-align: left;
       }
 
       .signal-btn:active { transform: scale(0.97); }
-      .signal-btn.selected { outline: 3px solid #1a1a18; outline-offset: 2px; }
 
-      .got  { background: #e1f5ee; color: #1d9e75; }
+      .got  { background: #e1f5ee; color: #0f6e56; }
       .sort { background: #fdf3dc; color: #c48a00; }
       .lost { background: #fdecea; color: #d85a30; }
 
-      .signal-emoji { font-size: 28px; }
+      .got.selected  { border-color: #0f6e56; }
+      .sort.selected { border-color: #c48a00; }
+      .lost.selected { border-color: #d85a30; }
+
+      .signal-emoji { font-size: 28px; flex-shrink: 0; }
 
       .signal-label { display: flex; flex-direction: column; gap: 2px; }
       .signal-label span:first-child { font-size: 17px; }
       .signal-label span:last-child  { font-size: 12px; font-weight: 400; opacity: 0.75; }
 
-      .submit-btn {
-        width: 100%;
-        background: #1a1a18;
-        color: #f7f5f0;
-        border: none;
-        border-radius: 14px;
-        padding: 18px;
-        font-size: 16px;
-        font-weight: 600;
-        cursor: pointer;
-        margin-bottom: 20px;
-        transition: opacity 0.2s;
+      /* Saving indicator */
+      .saving-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 28px;
+        margin: 6px 0 16px;
+        font-size: 12px;
+        color: #aeaca6;
+        transition: opacity 0.3s;
       }
 
-      .submit-btn:disabled { background: #888780; cursor: not-allowed; }
+      .saving-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #1d9e75;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
 
-      /* Question box */
-      .q-section { border-top: 1px solid #e0ddd7; padding-top: 20px; }
+      .saving-row.show .saving-dot { opacity: 1; animation: pulse 1s infinite; }
+      .saving-row.saved .saving-dot { opacity: 1; background: #1d9e75; animation: none; }
+
+      /* Question section — hidden by default */
+      .q-section {
+        border-top: 1px solid #e0ddd7;
+        padding-top: 20px;
+        margin-top: 4px;
+        display: none;
+      }
+
+      .q-section.visible { display: block; }
 
       .q-label {
         font-size: 13px;
         font-weight: 500;
         color: #444441;
-        margin-bottom: 8px;
+        margin-bottom: 4px;
+      }
+
+      .q-required {
+        font-size: 11px;
+        color: #d85a30;
+        margin-bottom: 10px;
       }
 
       textarea {
@@ -226,21 +253,31 @@
       }
 
       textarea:focus { border-color: #1a1a18; }
+      textarea.error-border { border-color: #d85a30; }
 
       .ask-btn {
         width: 100%;
-        background: transparent;
-        border: 1.5px solid #c8c5be;
+        background: #1a1a18;
+        border: none;
         border-radius: 12px;
         padding: 14px;
         font-size: 14px;
-        font-weight: 500;
-        color: #444441;
+        font-weight: 600;
+        color: #f7f5f0;
         cursor: pointer;
-        transition: border-color 0.2s;
+        transition: opacity 0.2s;
       }
 
-      .ask-btn:hover { border-color: #1a1a18; }
+      .ask-btn:hover    { opacity: 0.85; }
+      .ask-btn:disabled { background: #888780; cursor: not-allowed; }
+
+      .q-sent {
+        font-size: 12px;
+        color: #1d9e75;
+        text-align: center;
+        margin-top: 8px;
+        display: none;
+      }
 
       /* Submitted state */
       #submitted { display: none; text-align: center; padding: 16px 0; }
@@ -257,7 +294,7 @@
   </head>
   <body>
 
-    <!-- ══ JOIN SCREEN ══ -->
+    <!-- JOIN SCREEN -->
     <div class="card" id="joinScreen">
       <p class="badge">STUDENT</p>
       <h1>Join Session</h1>
@@ -281,7 +318,7 @@
       </p>
     </div>
 
-    <!-- ══ WAITING ROOM ══ -->
+    <!-- WAITING ROOM -->
     <div class="card" id="waiting">
       <div class="session-info" id="sessionInfo"></div>
       <div class="waiting-icon">⏳</div>
@@ -291,30 +328,30 @@
       </p>
     </div>
 
-    <!-- ══ ACTIVE ROUND ══ -->
+    <!-- ACTIVE ROUND -->
     <div class="card" id="active">
       <div class="round-header">
         <p class="badge">ROUND ACTIVE</p>
         <p class="round-title" id="sessionNameLabel"></p>
-        <p class="round-sub">How are you following along?</p>
+        <p class="round-sub">Tap to signal — you can change anytime.</p>
       </div>
 
       <div class="signal-grid">
-        <button class="signal-btn got"  onclick="selectSignal('got_it')"  id="btn_got_it">
+        <button class="signal-btn got"  id="btn_got_it"  onclick="selectSignal('got_it')">
           <span class="signal-emoji">✅</span>
           <span class="signal-label">
             <span>Got it</span>
             <span>I understand clearly</span>
           </span>
         </button>
-        <button class="signal-btn sort" onclick="selectSignal('sort_of')" id="btn_sort_of">
+        <button class="signal-btn sort" id="btn_sort_of" onclick="selectSignal('sort_of')">
           <span class="signal-emoji">🤔</span>
           <span class="signal-label">
             <span>Sort of</span>
             <span>Mostly following along</span>
           </span>
         </button>
-        <button class="signal-btn lost" onclick="selectSignal('lost')"    id="btn_lost">
+        <button class="signal-btn lost" id="btn_lost"    onclick="selectSignal('lost')">
           <span class="signal-emoji">🆘</span>
           <span class="signal-label">
             <span>Lost</span>
@@ -323,26 +360,30 @@
         </button>
       </div>
 
-      <button class="submit-btn" id="submitBtn" onclick="submitSignal()" disabled>
-        Send signal
-      </button>
+      <!-- Saving indicator -->
+      <div class="saving-row" id="savingRow">
+        <span class="saving-dot" id="savingDot"></span>
+        <span id="savingText"></span>
+      </div>
 
-      <div class="q-section">
-        <p class="q-label">Ask a question anonymously (optional)</p>
-        <textarea id="questionInput" placeholder="What confused you? Teacher will see top questions…"></textarea>
-        <button class="ask-btn" id="askBtn" onclick="submitQuestion()">Ask anonymously →</button>
+      <!-- Question section — only shown when Lost is selected -->
+      <div class="q-section" id="qSection">
+        <p class="q-label">What are you confused about?</p>
+        <p class="q-required">Required when selecting Lost — helps your teacher understand where to focus.</p>
+        <textarea id="questionInput" placeholder="Type your question here…"></textarea>
+        <button class="ask-btn" id="askBtn" onclick="submitQuestion()">Submit question →</button>
+        <p class="q-sent" id="qSent">✓ Question sent anonymously</p>
       </div>
     </div>
 
-    <!-- ══ SUBMITTED ══ -->
+    <!-- SUBMITTED / ROUND CLOSED -->
     <div class="card" id="submitted">
-      <div class="submitted-icon">🎉</div>
-      <p class="submitted-text">Response sent!<br />Waiting for the next round…</p>
+      <div class="submitted-icon">⏳</div>
+      <p class="submitted-text">Round closed.<br/>Waiting for the next round…</p>
     </div>
 
     <p class="footer">ClassPulse — anonymous classroom feedback</p>
 
-    <!-- Firebase SDK -->
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
       import {
@@ -363,36 +404,33 @@
       const app = initializeApp(firebaseConfig);
       const db  = getFirestore(app);
 
-      // ── State ──
-      let sessionId            = null;
-      let selectedSig          = null;
-      let unsubscribe          = null;
-      let hasSubmittedThisRound = false;
+      let sessionId  = null;
+      let selectedSig = null;
+      let unsubscribe = null;
+      let saveTimeout = null;
 
-      // Anonymous student ID (persists for this browser tab)
       const studentId = sessionStorage.getItem("studentId") || ("stu_" + Math.random().toString(36).slice(2, 10));
       sessionStorage.setItem("studentId", studentId);
 
-      // ── Auto-connect from URL on page load ──
+      // Auto-connect from URL on page load
       window.addEventListener("load", async () => {
-        const params         = new URLSearchParams(window.location.search);
+        const params = new URLSearchParams(window.location.search);
         const sessionFromUrl = params.get("session");
         if (sessionFromUrl && sessionFromUrl.trim()) {
-          document.getElementById("joinBtn").textContent    = "Connecting…";
-          document.getElementById("joinBtn").disabled       = true;
-          document.getElementById("codeInput").disabled     = true;
+          document.getElementById("joinBtn").textContent = "Connecting…";
+          document.getElementById("joinBtn").disabled    = true;
+          document.getElementById("codeInput").disabled  = true;
           await connectToSession(sessionFromUrl, true);
         }
       });
 
-      // ── Manual join ──
+      // Manual join
       window.joinSession = async function () {
         const code    = document.getElementById("codeInput").value.trim();
         const joinBtn = document.getElementById("joinBtn");
         joinBtn.disabled    = true;
         joinBtn.textContent = "Joining…";
         await connectToSession(code, false);
-        // Re-enable if it failed
         const errEl = document.getElementById("joinError");
         if (errEl.style.display !== "none") {
           joinBtn.disabled    = false;
@@ -400,7 +438,6 @@
         }
       };
 
-      // ── Core connect logic ──
       async function connectToSession(idOrCode, isDirectId) {
         const errEl = document.getElementById("joinError");
         errEl.style.display = "none";
@@ -409,21 +446,18 @@
           let sessionDoc = null;
 
           if (isDirectId) {
-            // Try direct doc read first
             const direct = await getDoc(doc(db, "sessions", idOrCode.trim()));
             if (direct.exists()) {
               sessionDoc = { id: direct.id, data: () => direct.data() };
             } else {
-              // Fallback: query all and match id
-              const all = await getDocs(collection(db, "sessions"));
+              const all   = await getDocs(collection(db, "sessions"));
               const match = all.docs.find(d => d.id === idOrCode.trim());
               if (match) sessionDoc = { id: match.id, data: () => match.data() };
             }
           } else {
-            // Look up by 4-digit code
             if (idOrCode.length !== 4 || isNaN(idOrCode)) {
-              errEl.textContent    = "Please enter a valid 4-digit code.";
-              errEl.style.display  = "block";
+              errEl.textContent   = "Please enter a valid 4-digit code.";
+              errEl.style.display = "block";
               return;
             }
             const q    = query(collection(db, "sessions"), where("code", "==", idOrCode));
@@ -437,10 +471,9 @@
             return;
           }
 
-          sessionId        = sessionDoc.id;
-          const data       = sessionDoc.data();
+          sessionId      = sessionDoc.id;
+          const data     = sessionDoc.data();
 
-          // Populate session info card
           document.getElementById("sessionInfo").innerHTML = `
             <p class="label">SESSION</p>
             <p class="value">${data.sessionName}</p>
@@ -449,14 +482,11 @@
           `;
           document.getElementById("sessionNameLabel").textContent = data.sessionName;
 
-          // Show waiting room
           document.getElementById("joinScreen").style.display = "none";
           document.getElementById("waiting").style.display    = "block";
 
-          // Update URL for deep-link / refresh
           window.history.replaceState({}, "", `${window.location.pathname}?session=${encodeURIComponent(sessionId)}`);
 
-          // Start live listener
           listenToSession(sessionId);
 
         } catch (e) {
@@ -466,76 +496,126 @@
         }
       }
 
-      // ── Live listener ──
-      function listenToSession(sid) {
-        if (unsubscribe) unsubscribe();
+     // Track if student has seen an active round yet
+let hasBeenActive = false;
 
-        unsubscribe = onSnapshot(doc(db, "sessions", sid), snap => {
-          if (!snap.exists()) return;
-          const data = snap.data();
+function listenToSession(sid) {
+  if (unsubscribe) unsubscribe();
+  unsubscribe = onSnapshot(doc(db, "sessions", sid), snap => {
+    if (!snap.exists()) return;
+    const data = snap.data();
 
-          if (data.active) {
-            document.getElementById("waiting").style.display   = "none";
-            document.getElementById("submitted").style.display = "none";
-            if (!hasSubmittedThisRound) {
-              document.getElementById("active").style.display  = "block";
-            }
-          } else {
-            // Round closed — reset for next round
-            hasSubmittedThisRound = false;
-            selectedSig           = null;
-            resetSignalButtons();
-            document.getElementById("submitBtn").disabled       = true;
-            document.getElementById("submitBtn").textContent    = "Send signal";
-            document.getElementById("active").style.display    = "none";
-            document.getElementById("submitted").style.display = "none";
-            document.getElementById("waiting").style.display   = "block";
-          }
-        });
+    if (data.active) {
+      hasBeenActive = true;
+      document.getElementById("waiting").style.display   = "none";
+      document.getElementById("submitted").style.display = "none";
+      document.getElementById("active").style.display    = "block";
+    } else {
+      // Only show "Round closed" if student has seen an active round
+      // On first join, just show waiting room
+      selectedSig = null;
+      resetSignalButtons();
+      hideQuestionSection();
+      showSaving('');
+      document.getElementById("active").style.display = "none";
+
+      if (hasBeenActive) {
+        document.getElementById("submitted").style.display = "block";
+        document.getElementById("waiting").style.display   = "none";
+      } else {
+        document.getElementById("waiting").style.display   = "block";
+        document.getElementById("submitted").style.display = "none";
       }
+    }
+  });
+}
+      // Tap a signal — auto-save to Firestore immediately
+      window.selectSignal = async function (signal) {
+        // Toggle off if tapping same button
+        if (selectedSig === signal) return;
 
-      // ── Signal selection ──
-      window.selectSignal = function (signal) {
         selectedSig = signal;
         resetSignalButtons();
         document.getElementById("btn_" + signal).classList.add("selected");
-        document.getElementById("submitBtn").disabled = false;
+
+        // Show/hide question box based on selection
+        if (signal === 'lost') {
+          showQuestionSection();
+        } else {
+          hideQuestionSection();
+        }
+
+        // Show saving indicator
+        showSaving('saving');
+
+        // Debounce rapid taps — wait 400ms before writing
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(async () => {
+          try {
+            await setDoc(doc(db, "sessions", sessionId, "students", studentId), {
+              signal:    signal,
+              updatedAt: serverTimestamp(),
+            });
+            showSaving('saved');
+            // Clear after 2s
+            setTimeout(() => showSaving(''), 2000);
+          } catch (e) {
+            console.error("Save failed:", e);
+            showSaving('');
+          }
+        }, 400);
       };
 
       function resetSignalButtons() {
-        ["got_it", "sort_of", "lost"].forEach(s => {
-          document.getElementById("btn_" + s).classList.remove("selected");
+        ["got_it", "sort_of", "lost"].forEach(id => {
+          document.getElementById("btn_" + id).classList.remove("selected");
         });
       }
 
-      // ── Submit signal ──
-      window.submitSignal = async function () {
-        if (!selectedSig || !sessionId) return;
+      function showQuestionSection() {
+        document.getElementById("qSection").classList.add("visible");
+        // Reset question state
+        document.getElementById("questionInput").value = "";
+        document.getElementById("questionInput").classList.remove("error-border");
+        document.getElementById("qSent").style.display = "none";
+        document.getElementById("askBtn").disabled     = false;
+        document.getElementById("askBtn").textContent  = "Submit question →";
+      }
 
-        // Disable button only — no text change
-        document.getElementById("submitBtn").disabled = true;
+      function hideQuestionSection() {
+        document.getElementById("qSection").classList.remove("visible");
+      }
 
-        try {
-          await setDoc(doc(db, "sessions", sessionId, "students", studentId), {
-            signal:    selectedSig,
-            updatedAt: serverTimestamp(),
-          });
-
-          hasSubmittedThisRound = true;
-          document.getElementById("active").style.display    = "none";
-          document.getElementById("submitted").style.display = "block";
-        } catch (e) {
-          // Re-enable on failure
-          document.getElementById("submitBtn").disabled = false;
-          alert("Could not send. Check your connection.");
+      function showSaving(state) {
+        const row  = document.getElementById("savingRow");
+        const text = document.getElementById("savingText");
+        row.className = "saving-row";
+        if (state === 'saving') {
+          row.classList.add("show");
+          text.textContent = "Saving…";
+        } else if (state === 'saved') {
+          row.classList.add("saved");
+          text.textContent = "✓ Response saved";
+        } else {
+          text.textContent = "";
         }
-      };
+      }
 
-      // ── Submit question ──
+      // Submit anonymous question (only for Lost)
       window.submitQuestion = async function () {
         const text   = document.getElementById("questionInput").value.trim();
         const askBtn = document.getElementById("askBtn");
-        if (!text || !sessionId) return;
+        const input  = document.getElementById("questionInput");
+
+        if (!text) {
+          input.classList.add("error-border");
+          input.focus();
+          return;
+        }
+
+        input.classList.remove("error-border");
+        askBtn.disabled    = true;
+        askBtn.textContent = "Sending…";
 
         try {
           await addDoc(collection(db, "sessions", sessionId, "questions"), {
@@ -544,10 +624,12 @@
             askedAt:   serverTimestamp(),
             studentId,
           });
-          document.getElementById("questionInput").value = "";
-          askBtn.textContent = "✅ Question sent!";
-          setTimeout(() => { askBtn.textContent = "Ask anonymously →"; }, 2000);
+          document.getElementById("qSent").style.display = "block";
+          askBtn.textContent = "✓ Sent";
+          input.value        = "";
         } catch (e) {
+          askBtn.disabled    = false;
+          askBtn.textContent = "Submit question →";
           alert("Could not send question. Try again.");
         }
       };

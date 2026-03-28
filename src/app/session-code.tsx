@@ -24,8 +24,8 @@ export default function SessionCode() {
   const [activating, setActivating] = useState(false);
   const [loadError, setLoadError] = useState('');
   const studentUrl = params
-    ? `https://classpulse-5a552.web.app/student.html?session=${encodeURIComponent(params.sessionId)}`
-    : '';
+  ? `https://classpulse-97289.web.app/student.html?session=${encodeURIComponent(params.sessionId)}`
+  : '';
 
   useEffect(() => {
   let retries = 0;

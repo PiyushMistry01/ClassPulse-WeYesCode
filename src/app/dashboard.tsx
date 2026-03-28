@@ -13,6 +13,9 @@ import {
 } from 'react-native';
 import { db } from '../firebase';
 
+// TODO: move to env before making repo public
+const ANTHROPIC_KEY = 'YOUR-NEW-KEY-HERE';
+
 type Signal = 'got_it' | 'sort_of' | 'lost';
 type StudentData = { signal: Signal };
 
@@ -34,7 +37,11 @@ async function groupAndFilterQuestions(questions: RawQuestion[], sessionTopic: s
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type':      'application/json',
+        'x-api-key':         ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
@@ -86,22 +93,35 @@ export default function Dashboard() {
   const [showTimerAlert, setShowTimerAlert] = useState(false);
   const [processing, setProcessing]         = useState(false);
   const [secondsLeft, setSecondsLeft]       = useState(15 * 60);
-  const [timerRunning, setTimerRunning]     = useState(true);
-  const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [timerRunning, setTimerRunning]     = useState(false); // false by default — starts when round closes
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastQCount = useRef(0);
 
+  // Load session from AsyncStorage
   useEffect(() => {
     AsyncStorage.getItem('currentSession').then(raw => {
       if (!raw) { router.replace('/'); return; }
-      const s = JSON.parse(raw);
+      const s    = JSON.parse(raw);
       const mins = parseInt(s.alertMins) || 15;
       setSession({ ...s, alertThreshold: parseInt(s.alertThreshold), alertMins: mins });
       setSecondsLeft(mins * 60);
     });
   }, []);
 
+  // Timer logic — runs ONLY when round is closed AND timerRunning is true
   useEffect(() => {
-    if (!session || !timerRunning) return;
+    if (!session) return;
+
+    // Round is active — clear timer, do nothing
+    if (active) {
+      clearInterval(timerRef.current!);
+      return;
+    }
+
+    // Round is closed but timer not started yet
+    if (!timerRunning) return;
+
+    // Start countdown
     timerRef.current = setInterval(() => {
       setSecondsLeft(prev => {
         if (prev <= 1) {
@@ -114,8 +134,9 @@ export default function Dashboard() {
         return prev - 1;
       });
     }, 1000);
+
     return () => clearInterval(timerRef.current!);
-  }, [session, timerRunning]);
+  }, [session, active, timerRunning]);
 
   function resetTimer() {
     clearInterval(timerRef.current!);
@@ -124,6 +145,12 @@ export default function Dashboard() {
     setShowTimerAlert(false);
   }
 
+  function pauseTimer() {
+    clearInterval(timerRef.current!);
+    setTimerRunning(false);
+  }
+
+  // Firestore listeners
   useEffect(() => {
     if (!session) return;
     const s1 = onSnapshot(doc(db, 'sessions', session.sessionId), snap => {
@@ -143,22 +170,18 @@ export default function Dashboard() {
     return () => { s1(); s2(); s3(); };
   }, [session]);
 
+  // AI question grouping
   useEffect(() => {
-  if (!session || rawQuestions.length === 0) { setGroupedQs([]); return; }
-  if (rawQuestions.length === lastQCount.current) return;
-  lastQCount.current = rawQuestions.length;
+    if (!session || rawQuestions.length === 0) { setGroupedQs([]); return; }
+    if (rawQuestions.length === lastQCount.current) return;
+    lastQCount.current = rawQuestions.length;
+    setProcessing(true);
+    groupAndFilterQuestions(rawQuestions, session.sessionName)
+      .then(setGroupedQs)
+      .finally(() => setProcessing(false));
+  }, [rawQuestions.length]);
 
-  // Bypass AI — show raw questions directly
-  const raw = rawQuestions.map(q => ({
-    representativeText: q.text,
-    count: 1,
-    upvotes: q.upvotes || 0,
-    priority: 1,
-    ids: [q.id],
-  }));
-  setGroupedQs(raw);
-}, [rawQuestions.length]);
-
+  // Lost % vibration alert
   useEffect(() => {
     if (!session || !active) return;
     const total = Object.keys(students).length;
@@ -181,19 +204,34 @@ export default function Dashboard() {
   const isAlert = session && lostPct >= session.alertThreshold && total > 0;
   const mm      = Math.floor(secondsLeft / 60).toString().padStart(2, '0');
   const ss      = (secondsLeft % 60).toString().padStart(2, '0');
-  const tColor  = secondsLeft <= 60 ? '#D85A30' : secondsLeft <= 180 ? '#C48A00' : '#1A1A18';
+
+  // Gray when active/paused, red/amber/black when counting down
+  const tColor = active
+    ? '#AEACA6'
+    : secondsLeft <= 60
+      ? '#D85A30'
+      : secondsLeft <= 180
+        ? '#C48A00'
+        : '#1A1A18';
 
   async function toggleRound() {
     if (!session) return;
-    await updateDoc(doc(db, 'sessions', session.sessionId), { active: !active });
-    if (!active) resetTimer();
+    const nowActive = !active;
+    await updateDoc(doc(db, 'sessions', session.sessionId), { active: nowActive });
+    if (nowActive) {
+      // Round just STARTED — pause timer
+      pauseTimer();
+    } else {
+      // Round just CLOSED — start countdown
+      resetTimer();
+    }
   }
 
   async function activateNow() {
     if (!session) return;
     await updateDoc(doc(db, 'sessions', session.sessionId), { active: true });
     setShowTimerAlert(false);
-    resetTimer();
+    pauseTimer();
   }
 
   async function endSession() {
@@ -203,7 +241,7 @@ export default function Dashboard() {
         if (!session) return;
         await updateDoc(doc(db, 'sessions', session.sessionId), { active: false, ended: true });
         await AsyncStorage.removeItem('currentSession');
-        router.replace({ pathname: '/analysis', params: { sessionId: session.sessionId } } as any);
+        router.replace('/');
       }}
     ]);
   }
@@ -249,14 +287,22 @@ export default function Dashboard() {
         {/* Timer */}
         <View style={s.timerCard}>
           <View>
-            <Text style={s.timerLabel}>NEXT CHECK-IN</Text>
-            <Text style={[s.timerValue, { color: tColor }]}>{mm}:{ss}</Text>
+            <Text style={s.timerLabel}>
+              {active ? 'ROUND ACTIVE' : timerRunning ? 'NEXT CHECK-IN' : 'TIMER READY'}
+            </Text>
+            <Text style={[s.timerValue, { color: tColor }]}>
+              {active ? '—  —' : `${mm}:${ss}`}
+            </Text>
           </View>
           <View style={s.timerRight}>
-            <Text style={s.timerHint}>Every {session.alertMins} min</Text>
-            <TouchableOpacity style={s.resetBtn} onPress={resetTimer}>
-              <Text style={s.resetBtnText}>↺ Reset</Text>
-            </TouchableOpacity>
+            <Text style={s.timerHint}>
+              {active ? 'Paused during round' : `Every ${session.alertMins} min`}
+            </Text>
+            {!active && (
+              <TouchableOpacity style={s.resetBtn} onPress={resetTimer}>
+                <Text style={s.resetBtnText}>↺ Reset</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -314,7 +360,7 @@ export default function Dashboard() {
               <Text style={[s.rankText, i === 0 && s.rankTextTop]}>#{i + 1}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              {i === 0 && <Text style={s.topLabel}>🔥 Highest Priority</Text>}
+              {i === 0 && <Text style={s.topLabel}>Highest Priority</Text>}
               <Text style={s.qText}>{q.representativeText}</Text>
               <View style={s.qTags}>
                 {q.count > 1 && (
