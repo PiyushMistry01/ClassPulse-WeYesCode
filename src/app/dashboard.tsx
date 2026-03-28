@@ -93,22 +93,33 @@ export default function Dashboard() {
   const [showTimerAlert, setShowTimerAlert] = useState(false);
   const [processing, setProcessing]         = useState(false);
   const [secondsLeft, setSecondsLeft]       = useState(15 * 60);
-  const [timerRunning, setTimerRunning]     = useState(false); // false by default — starts when round closes
+  const [timerRunning, setTimerRunning]     = useState(false);
+  const [roundEverStarted, setRoundEverStarted] = useState(false); // ← NEW: tracks if teacher has started at least one round
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastQCount = useRef(0);
 
-  // Load session from AsyncStorage
+  // Load session from AsyncStorage and FORCE round to closed state
   useEffect(() => {
-    AsyncStorage.getItem('currentSession').then(raw => {
+    AsyncStorage.getItem('currentSession').then(async raw => {
       if (!raw) { router.replace('/'); return; }
       const s    = JSON.parse(raw);
       const mins = parseInt(s.alertMins) || 15;
       setSession({ ...s, alertThreshold: parseInt(s.alertThreshold), alertMins: mins });
       setSecondsLeft(mins * 60);
+
+      // ✅ Always force round to inactive when dashboard first loads
+      // This ensures the round is never auto-started when teacher opens the session
+      if (s.sessionId) {
+        try {
+          await updateDoc(doc(db, 'sessions', s.sessionId), { active: false });
+        } catch (e) {
+          console.error('Failed to reset active state:', e);
+        }
+      }
     });
   }, []);
 
-  // Timer logic — runs ONLY when round is closed AND timerRunning is true
+  // Timer logic — runs ONLY after first round has been started AND round is closed AND timerRunning is true
   useEffect(() => {
     if (!session) return;
 
@@ -117,6 +128,9 @@ export default function Dashboard() {
       clearInterval(timerRef.current!);
       return;
     }
+
+    // ✅ Don't run timer if teacher hasn't started even one round yet
+    if (!roundEverStarted) return;
 
     // Round is closed but timer not started yet
     if (!timerRunning) return;
@@ -136,7 +150,7 @@ export default function Dashboard() {
     }, 1000);
 
     return () => clearInterval(timerRef.current!);
-  }, [session, active, timerRunning]);
+  }, [session, active, timerRunning, roundEverStarted]);
 
   function resetTimer() {
     clearInterval(timerRef.current!);
@@ -172,14 +186,20 @@ export default function Dashboard() {
 
   // AI question grouping
   useEffect(() => {
-    if (!session || rawQuestions.length === 0) { setGroupedQs([]); return; }
-    if (rawQuestions.length === lastQCount.current) return;
-    lastQCount.current = rawQuestions.length;
-    setProcessing(true);
-    groupAndFilterQuestions(rawQuestions, session.sessionName)
-      .then(setGroupedQs)
-      .finally(() => setProcessing(false));
-  }, [rawQuestions.length]);
+  if (!session || rawQuestions.length === 0) { setGroupedQs([]); return; }
+  if (rawQuestions.length === lastQCount.current) return;
+  lastQCount.current = rawQuestions.length;
+
+  // Bypass AI — show raw questions directly
+  const raw = rawQuestions.map(q => ({
+    representativeText: q.text,
+    count: 1,
+    upvotes: q.upvotes || 0,
+    priority: 1,
+    ids: [q.id],
+  }));
+  setGroupedQs(raw);
+}, [rawQuestions.length]);
 
   // Lost % vibration alert
   useEffect(() => {
@@ -205,8 +225,9 @@ export default function Dashboard() {
   const mm      = Math.floor(secondsLeft / 60).toString().padStart(2, '0');
   const ss      = (secondsLeft % 60).toString().padStart(2, '0');
 
-  // Gray when active/paused, red/amber/black when counting down
-  const tColor = active
+  // Timer color logic
+  // Gray when active or timer not yet started, red/amber/black when counting down
+  const tColor = active || !roundEverStarted
     ? '#AEACA6'
     : secondsLeft <= 60
       ? '#D85A30'
@@ -218,8 +239,10 @@ export default function Dashboard() {
     if (!session) return;
     const nowActive = !active;
     await updateDoc(doc(db, 'sessions', session.sessionId), { active: nowActive });
+
     if (nowActive) {
-      // Round just STARTED — pause timer
+      // Round just STARTED
+      setRoundEverStarted(true); // ✅ Mark that teacher has started at least one round
       pauseTimer();
     } else {
       // Round just CLOSED — start countdown
@@ -230,6 +253,7 @@ export default function Dashboard() {
   async function activateNow() {
     if (!session) return;
     await updateDoc(doc(db, 'sessions', session.sessionId), { active: true });
+    setRoundEverStarted(true);
     setShowTimerAlert(false);
     pauseTimer();
   }
@@ -288,17 +312,27 @@ export default function Dashboard() {
         <View style={s.timerCard}>
           <View>
             <Text style={s.timerLabel}>
-              {active ? 'ROUND ACTIVE' : timerRunning ? 'NEXT CHECK-IN' : 'TIMER READY'}
+              {active
+                ? 'ROUND ACTIVE'
+                : !roundEverStarted
+                  ? 'START A ROUND TO BEGIN'   // ✅ New label for pre-first-round state
+                  : timerRunning
+                    ? 'NEXT CHECK-IN'
+                    : 'TIMER READY'}
             </Text>
             <Text style={[s.timerValue, { color: tColor }]}>
-              {active ? '—  —' : `${mm}:${ss}`}
+              {active || !roundEverStarted ? '—  —' : `${mm}:${ss}`}
             </Text>
           </View>
           <View style={s.timerRight}>
             <Text style={s.timerHint}>
-              {active ? 'Paused during round' : `Every ${session.alertMins} min`}
+              {active
+                ? 'Paused during round'
+                : !roundEverStarted
+                  ? 'Tap ▶ Start Round below'   // ✅ Hint guiding teacher
+                  : `Every ${session.alertMins} min`}
             </Text>
-            {!active && (
+            {!active && roundEverStarted && (
               <TouchableOpacity style={s.resetBtn} onPress={resetTimer}>
                 <Text style={s.resetBtnText}>↺ Reset</Text>
               </TouchableOpacity>
