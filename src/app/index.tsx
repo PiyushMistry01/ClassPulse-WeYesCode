@@ -1,12 +1,14 @@
-import {
-  View, Text, TextInput, TouchableOpacity,
-  StyleSheet, SafeAreaView, ScrollView, StatusBar
-} from 'react-native';
-import { useState } from 'react';
-import { useRouter } from 'expo-router';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from "../firebase";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import { addDoc, collection, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { useState } from 'react';
+import {
+    SafeAreaView, ScrollView, StatusBar,
+    StyleSheet,
+    Text, TextInput, TouchableOpacity,
+    View
+} from 'react-native';
+import { db } from "../firebase";
 
 
 function generate4DigitCode() {
@@ -17,6 +19,7 @@ export default function TeacherSetup() {
   const router = useRouter();
   const [teacherName, setTeacherName] = useState('');
   const [sessionName, setSessionName] = useState('');
+  const [contextRaw, setContextRaw] = useState('');
   const [alertThreshold, setAlertThreshold] = useState('40');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -38,6 +41,7 @@ export default function TeacherSetup() {
 
     try {
       const code = generate4DigitCode();
+      const normalizedContextRaw = contextRaw.trim().slice(0, 1000);
 
       // Save session to Firestore
       const sessionRef = await addDoc(collection(db, 'sessions'), {
@@ -47,9 +51,44 @@ export default function TeacherSetup() {
         code,
         createdAt: serverTimestamp(),
         active: false,
+        contextRaw: normalizedContextRaw,
         students: {},        // { studentId: { signal, question } }
         questions: [],       // anonymous question queue
       });
+
+      // Context analysis runs in background and does not block session creation.
+      if (normalizedContextRaw) {
+        void (async () => {
+          try {
+            const res = await fetch('/extract-context', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ contextRaw: normalizedContextRaw }),
+            });
+
+            if (!res.ok) {
+              throw new Error(`extract-context failed: ${res.status}`);
+            }
+
+            const data = (await res.json()) as { topics?: unknown; summary?: unknown };
+            const topics = Array.isArray(data.topics)
+              ? data.topics.filter((item): item is string => typeof item === 'string')
+              : [];
+            const summary = typeof data.summary === 'string' ? data.summary : '';
+
+            if (!topics.length && !summary) {
+              return;
+            }
+
+            await updateDoc(doc(db, 'sessions', sessionRef.id), {
+              contextTopics: topics,
+              contextSummary: summary,
+            });
+          } catch (analysisError) {
+            console.warn('Context analysis failed:', analysisError);
+          }
+        })();
+      }
 
       const sessionData = {
   sessionId: sessionRef.id,
@@ -113,6 +152,22 @@ console.log('✅ router.push called');
               onChangeText={setSessionName}
               autoCapitalize="sentences"
             />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>What are you going to teach today?</Text>
+            <TextInput
+              style={[styles.input, styles.contextInput]}
+              placeholder="Example: Today I will explain pointers, memory and arrays"
+              placeholderTextColor="#AEACA6"
+              value={contextRaw}
+              onChangeText={setContextRaw}
+              multiline
+              numberOfLines={4}
+              maxLength={1000}
+              textAlignVertical="top"
+            />
+            <Text style={styles.hint}>This helps auto-tag session topics and summary.</Text>
           </View>
 
           <View style={styles.field}>
@@ -213,6 +268,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     color: '#1A1A18',
+  },
+  contextInput: {
+    minHeight: 112,
   },
   thresholdRow: {
     flexDirection: 'row',

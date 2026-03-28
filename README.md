@@ -16,6 +16,18 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npx expo start
    ```
 
+3. Configure AI context extraction (optional)
+
+   Create a `.env` file in the project root:
+
+   ```bash
+   OPENAI_API_KEY=your_openai_api_key
+   ```
+
+   This enables backend AI endpoints:
+   - `/extract-context` to extract `contextTopics` and `contextSummary` from teacher context
+   - `/validate-question` to classify anonymous student questions as relevant or irrelevant to session context
+
 In the output, you'll find options to open the app in a
 
 - [development build](https://docs.expo.dev/develop/development-builds/introduction/)
