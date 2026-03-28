@@ -1,636 +1,561 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ClassPulse — Join Session</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ClassPulse — Join Session</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #F7F5F0;
-      color: #1A1A18;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-    }
-
-    .card {
-      background: #fff;
-      border-radius: 20px;
-      border: 1px solid #E0DDD7;
-      padding: 32px 28px;
-      width: 100%;
-      max-width: 420px;
-      box-shadow: 0 2px 16px rgba(0,0,0,0.06);
-    }
-
-    .badge {
-      font-size: 11px;
-      letter-spacing: 2.5px;
-      color: #1D9E75;
-      font-weight: 600;
-      margin-bottom: 10px;
-    }
-
-    h1 {
-      font-size: 28px;
-      font-weight: 600;
-      letter-spacing: -0.5px;
-      margin-bottom: 6px;
-    }
-
-    .subtitle {
-      font-size: 14px;
-      color: #888780;
-      margin-bottom: 28px;
-      line-height: 20px;
-    }
-
-    input {
-      width: 100%;
-      background: #F7F5F0;
-      border: 1.5px solid #E0DDD7;
-      border-radius: 12px;
-      padding: 14px 16px;
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: 8px;
-      text-align: center;
-      color: #1A1A18;
-      outline: none;
-      margin-bottom: 12px;
-      transition: border-color 0.2s;
-    }
-
-    input:focus { border-color: #1A1A18; }
-
-    .join-btn {
-      width: 100%;
-      background: #1A1A18;
-      color: #F7F5F0;
-      border: none;
-      border-radius: 14px;
-      padding: 18px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      margin-bottom: 8px;
-      transition: opacity 0.2s;
-    }
-
-    .join-btn:hover { opacity: 0.85; }
-    .join-btn:disabled { background: #888780; cursor: not-allowed; }
-
-    .error {
-      font-size: 13px;
-      color: #D85A30;
-      background: #FAECE7;
-      padding: 10px 14px;
-      border-radius: 8px;
-      margin-bottom: 12px;
-      display: none;
-    }
-
-    /* ── Waiting room ── */
-    #waiting {
-      display: none;
-      text-align: center;
-    }
-
-    .session-info {
-      background: #F7F5F0;
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 24px;
-      text-align: left;
-    }
-
-    .session-info .label {
-      font-size: 11px;
-      color: #AEACA6;
-      letter-spacing: 0.5px;
-      margin-bottom: 2px;
-    }
-
-    .session-info .value {
-      font-size: 15px;
-      font-weight: 600;
-      color: #1A1A18;
-    }
-
-    .waiting-icon {
-      font-size: 48px;
-      margin-bottom: 16px;
-    }
-
-    .waiting-text {
-      font-size: 16px;
-      color: #888780;
-      line-height: 24px;
-    }
-
-    .pulse {
-      display: inline-block;
-      width: 10px;
-      height: 10px;
-      background: #1D9E75;
-      border-radius: 50%;
-      margin-right: 8px;
-      animation: pulse 1.5s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.8); }
-    }
-
-    /* ── Active round ── */
-    #active {
-      display: none;
-    }
-
-    .round-header {
-      text-align: center;
-      margin-bottom: 24px;
-    }
-
-    .round-title {
-      font-size: 20px;
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-
-    .round-sub {
-      font-size: 13px;
-      color: #888780;
-    }
-
-    .signal-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-bottom: 24px;
-    }
-
-    .signal-btn {
-      border: none;
-      border-radius: 16px;
-      padding: 20px 16px;
-      font-size: 18px;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      transition: transform 0.15s, opacity 0.15s;
-    }
-
-    .signal-btn:active { transform: scale(0.97); }
-
-    .signal-btn.selected { outline: 3px solid #1A1A18; outline-offset: 2px; }
-
-    .got  { background: #E1F5EE; color: #1D9E75; }
-    .sort { background: #FDF3DC; color: #C48A00; }
-    .lost { background: #FDECEA; color: #D85A30; }
-
-    .signal-emoji { font-size: 28px; }
-
-    .signal-label { display: flex; flex-direction: column; gap: 2px; }
-    .signal-label span:first-child { font-size: 17px; }
-    .signal-label span:last-child { font-size: 12px; font-weight: 400; opacity: 0.75; }
-
-    .submit-btn {
-      width: 100%;
-      background: #1A1A18;
-      color: #F7F5F0;
-      border: none;
-      border-radius: 14px;
-      padding: 18px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      margin-bottom: 20px;
-      transition: opacity 0.2s;
-    }
-
-    .submit-btn:disabled { background: #888780; cursor: not-allowed; }
-
-    /* Question box */
-    .q-section {
-      border-top: 1px solid #E0DDD7;
-      padding-top: 20px;
-    }
-
-    .q-label {
-      font-size: 13px;
-      font-weight: 500;
-      color: #444441;
-      margin-bottom: 8px;
-    }
-
-    textarea {
-      width: 100%;
-      background: #F7F5F0;
-      border: 1.5px solid #E0DDD7;
-      border-radius: 12px;
-      padding: 12px 14px;
-      font-size: 14px;
-      color: #1A1A18;
-      resize: none;
-      height: 80px;
-      outline: none;
-      font-family: inherit;
-      margin-bottom: 10px;
-      transition: border-color 0.2s;
-    }
-
-    textarea:focus { border-color: #1A1A18; }
-
-    .ask-btn {
-      width: 100%;
-      background: transparent;
-      border: 1.5px solid #C8C5BE;
-      border-radius: 12px;
-      padding: 14px;
-      font-size: 14px;
-      font-weight: 500;
-      color: #444441;
-      cursor: pointer;
-      transition: border-color 0.2s;
-    }
-
-    .ask-btn:hover { border-color: #1A1A18; }
-
-    /* Submitted state */
-    #submitted {
-      display: none;
-      text-align: center;
-      padding: 16px 0;
-    }
-
-    .submitted-icon { font-size: 48px; margin-bottom: 12px; }
-    .submitted-text { font-size: 16px; color: #888780; line-height: 24px; }
-
-    .footer {
-      margin-top: 24px;
-      font-size: 12px;
-      color: #AEACA6;
-      text-align: center;
-    }
-  </style>
-</head>
-<body>
-
-<!-- ══ JOIN SCREEN ══ -->
-<div class="card" id="joinScreen">
-  <p class="badge">STUDENT</p>
-  <h1>Join Session</h1>
-  <p class="subtitle">Enter the 4-digit code your teacher shared.</p>
-
-  <div class="error" id="joinError"></div>
-
-  <input
-    id="codeInput"
-    type="tel"
-    maxlength="4"
-    placeholder="1234"
-    autocomplete="off"
-    inputmode="numeric"
-  />
-
-  <button class="join-btn" id="joinBtn" onclick="joinSession()">Join →</button>
-
-  <p style="font-size:12px; color:#AEACA6; text-align:center; margin-top:8px;">
-    No account or app needed.
-  </p>
-</div>
-
-<!-- ══ WAITING ROOM ══ -->
-<div class="card" id="waiting">
-  <div class="session-info" id="sessionInfo"></div>
-  <div class="waiting-icon">⏳</div>
-  <p class="waiting-text">
-    <span class="pulse"></span>
-    Waiting for the teacher to start the round…
-  </p>
-</div>
-
-<!-- ══ ACTIVE ROUND ══ -->
-<div class="card" id="active">
-  <div class="round-header">
-    <p class="badge">ROUND ACTIVE</p>
-    <p class="round-title" id="sessionNameLabel"></p>
-    <p class="round-sub">How are you following along?</p>
-  </div>
-
-  <div class="signal-grid">
-    <button class="signal-btn got"  onclick="selectSignal('got_it')"  id="btn_got_it">
-      <span class="signal-emoji">✅</span>
-      <span class="signal-label">
-        <span>Got it</span>
-        <span>I understand clearly</span>
-      </span>
-    </button>
-    <button class="signal-btn sort" onclick="selectSignal('sort_of')" id="btn_sort_of">
-      <span class="signal-emoji">🤔</span>
-      <span class="signal-label">
-        <span>Sort of</span>
-        <span>Mostly following along</span>
-      </span>
-    </button>
-    <button class="signal-btn lost" onclick="selectSignal('lost')"    id="btn_lost">
-      <span class="signal-emoji">🆘</span>
-      <span class="signal-label">
-        <span>Lost</span>
-        <span>Need more explanation</span>
-      </span>
-    </button>
-  </div>
-
-  <button class="submit-btn" id="submitBtn" onclick="submitSignal()" disabled>
-    Send signal
-  </button>
-
-  <div class="q-section">
-    <p class="q-label">Ask a question anonymously (optional)</p>
-    <textarea id="questionInput" placeholder="What confused you? Teacher will see top questions…"></textarea>
-    <button class="ask-btn" onclick="submitQuestion()">Ask anonymously →</button>
-  </div>
-</div>
-
-<!-- ══ SUBMITTED ══ -->
-<div class="card" id="submitted">
-  <div class="submitted-icon">🎉</div>
-  <p class="submitted-text">Response sent!<br>Waiting for the next round…</p>
-</div>
-
-<p class="footer">ClassPulse — anonymous classroom feedback</p>
-
-<!-- Firebase SDK -->
-<script type="module">
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-  import {
-    getFirestore, collection, query, where, getDocs,
-    doc, getDoc, setDoc, addDoc, onSnapshot, serverTimestamp
-  } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-
-  // ── Firebase config (same project as teacher app) ──
-  const firebaseConfig = {
-    apiKey: "AIzaSyB0lQ4kN9YBskuaNp-8AcOfTAfUYPbhSbU",
-    authDomain: "classpulse-97289.firebaseapp.com",
-    projectId: "classpulse-97289",
-    storageBucket: "classpulse-97289.firebasestorage.app",
-    messagingSenderId: "844668167541",
-    appId: "1:844668167541:web:dfd90a7024876a30d05f3c"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db  = getFirestore(app);
-
-  // ── State ──
-  let sessionId   = null;
-  let studentId   = null;
-  let selectedSig = null;
-  let unsubscribe = null;
-  let hasSubmittedThisRound = false;
-
-  // Generate anonymous student ID
-  function genStudentId() {
-    return 'stu_' + Math.random().toString(36).slice(2, 10);
-  }
-
-  studentId = sessionStorage.getItem('studentId') || genStudentId();
-  sessionStorage.setItem('studentId', studentId);
-
-  // ── Connect to session (extracted for reuse) ──
-  async function connectToSession(sessionIdOrCode, isDirectId = false) {
-    const errEl = document.getElementById('joinError');
-    errEl.style.display = 'none';
-
-    const findByCode = async (code) => {
-      const q = query(collection(db, 'sessions'), where('code', '==', code));
-      const snap = await getDocs(q);
-      return snap.empty ? null : snap.docs[0];
-    };
-
-    const findByIdWithListFallback = async (id) => {
-      const cleanId = String(id).trim();
-
-      // First attempt: direct doc read
-      try {
-        const directSnap = await getDoc(doc(db, 'sessions', cleanId));
-        if (directSnap.exists()) {
-          return {
-            id: directSnap.id,
-            data: () => directSnap.data(),
-          };
-        }
-      } catch (_) {
-        // Some Firestore rules allow list/query but not direct get.
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f7f5f0;
+        color: #1a1a18;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
       }
 
-      // Fallback: query all docs and match by id
-      try {
-        const allSnap = await getDocs(collection(db, 'sessions'));
-        return allSnap.docs.find((d) => d.id === cleanId) || null;
-      } catch (_) {
-        return null;
+      .card {
+        background: #fff;
+        border-radius: 20px;
+        border: 1px solid #e0ddd7;
+        padding: 32px 28px;
+        width: 100%;
+        max-width: 420px;
+        box-shadow: 0 2px 16px rgba(0,0,0,0.06);
       }
-    };
 
-    try {
-      let sessionDoc;
+      .badge {
+        font-size: 11px;
+        letter-spacing: 2.5px;
+        color: #1d9e75;
+        font-weight: 600;
+        margin-bottom: 10px;
+      }
 
-      if (isDirectId) {
-        // Direct session ID from URL (QR code)
-        const directId = String(sessionIdOrCode).trim();
-        sessionDoc = await findByIdWithListFallback(directId);
+      h1 {
+        font-size: 28px;
+        font-weight: 600;
+        letter-spacing: -0.5px;
+        margin-bottom: 6px;
+      }
 
-        // Backward compatibility: if QR/session param is a 4-digit code, use existing code lookup.
-        if (!sessionDoc && directId.length === 4 && !isNaN(directId)) {
-          sessionDoc = await findByCode(directId);
+      .subtitle {
+        font-size: 14px;
+        color: #888780;
+        margin-bottom: 28px;
+        line-height: 20px;
+      }
+
+      input {
+        width: 100%;
+        background: #f7f5f0;
+        border: 1.5px solid #e0ddd7;
+        border-radius: 12px;
+        padding: 14px 16px;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 8px;
+        text-align: center;
+        color: #1a1a18;
+        outline: none;
+        margin-bottom: 12px;
+        transition: border-color 0.2s;
+      }
+
+      input:focus { border-color: #1a1a18; }
+
+      .join-btn {
+        width: 100%;
+        background: #1a1a18;
+        color: #f7f5f0;
+        border: none;
+        border-radius: 14px;
+        padding: 18px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        margin-bottom: 8px;
+        transition: opacity 0.2s;
+      }
+
+      .join-btn:hover { opacity: 0.85; }
+      .join-btn:disabled { background: #888780; cursor: not-allowed; }
+
+      .error {
+        font-size: 13px;
+        color: #d85a30;
+        background: #faece7;
+        padding: 10px 14px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+        display: none;
+      }
+
+      /* ── Waiting room ── */
+      #waiting { display: none; text-align: center; }
+
+      .session-info {
+        background: #f7f5f0;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 24px;
+        text-align: left;
+      }
+
+      .session-info .label {
+        font-size: 11px;
+        color: #aeaca6;
+        letter-spacing: 0.5px;
+        margin-bottom: 2px;
+      }
+
+      .session-info .value {
+        font-size: 15px;
+        font-weight: 600;
+        color: #1a1a18;
+      }
+
+      .waiting-icon { font-size: 48px; margin-bottom: 16px; }
+
+      .waiting-text {
+        font-size: 16px;
+        color: #888780;
+        line-height: 24px;
+      }
+
+      .pulse {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        background: #1d9e75;
+        border-radius: 50%;
+        margin-right: 8px;
+        animation: pulse 1.5s infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50%       { opacity: 0.4; transform: scale(0.8); }
+      }
+
+      /* ── Active round ── */
+      #active { display: none; }
+
+      .round-header { text-align: center; margin-bottom: 24px; }
+      .round-title  { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+      .round-sub    { font-size: 13px; color: #888780; }
+
+      .signal-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+
+      .signal-btn {
+        border: none;
+        border-radius: 16px;
+        padding: 20px 16px;
+        font-size: 18px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        transition: transform 0.15s, opacity 0.15s;
+      }
+
+      .signal-btn:active { transform: scale(0.97); }
+      .signal-btn.selected { outline: 3px solid #1a1a18; outline-offset: 2px; }
+
+      .got  { background: #e1f5ee; color: #1d9e75; }
+      .sort { background: #fdf3dc; color: #c48a00; }
+      .lost { background: #fdecea; color: #d85a30; }
+
+      .signal-emoji { font-size: 28px; }
+
+      .signal-label { display: flex; flex-direction: column; gap: 2px; }
+      .signal-label span:first-child { font-size: 17px; }
+      .signal-label span:last-child  { font-size: 12px; font-weight: 400; opacity: 0.75; }
+
+      .submit-btn {
+        width: 100%;
+        background: #1a1a18;
+        color: #f7f5f0;
+        border: none;
+        border-radius: 14px;
+        padding: 18px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        margin-bottom: 20px;
+        transition: opacity 0.2s;
+      }
+
+      .submit-btn:disabled { background: #888780; cursor: not-allowed; }
+
+      /* Question box */
+      .q-section { border-top: 1px solid #e0ddd7; padding-top: 20px; }
+
+      .q-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: #444441;
+        margin-bottom: 8px;
+      }
+
+      textarea {
+        width: 100%;
+        background: #f7f5f0;
+        border: 1.5px solid #e0ddd7;
+        border-radius: 12px;
+        padding: 12px 14px;
+        font-size: 14px;
+        color: #1a1a18;
+        resize: none;
+        height: 80px;
+        outline: none;
+        font-family: inherit;
+        margin-bottom: 10px;
+        transition: border-color 0.2s;
+      }
+
+      textarea:focus { border-color: #1a1a18; }
+
+      .ask-btn {
+        width: 100%;
+        background: transparent;
+        border: 1.5px solid #c8c5be;
+        border-radius: 12px;
+        padding: 14px;
+        font-size: 14px;
+        font-weight: 500;
+        color: #444441;
+        cursor: pointer;
+        transition: border-color 0.2s;
+      }
+
+      .ask-btn:hover { border-color: #1a1a18; }
+
+      /* Submitted state */
+      #submitted { display: none; text-align: center; padding: 16px 0; }
+      .submitted-icon { font-size: 48px; margin-bottom: 12px; }
+      .submitted-text { font-size: 16px; color: #888780; line-height: 24px; }
+
+      .footer {
+        margin-top: 24px;
+        font-size: 12px;
+        color: #aeaca6;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+
+    <!-- ══ JOIN SCREEN ══ -->
+    <div class="card" id="joinScreen">
+      <p class="badge">STUDENT</p>
+      <h1>Join Session</h1>
+      <p class="subtitle">Enter the 4-digit code your teacher shared.</p>
+
+      <div class="error" id="joinError"></div>
+
+      <input
+        id="codeInput"
+        type="tel"
+        maxlength="4"
+        placeholder="1234"
+        autocomplete="off"
+        inputmode="numeric"
+      />
+
+      <button class="join-btn" id="joinBtn" onclick="joinSession()">Join →</button>
+
+      <p style="font-size:12px; color:#aeaca6; text-align:center; margin-top:8px;">
+        No account or app needed.
+      </p>
+    </div>
+
+    <!-- ══ WAITING ROOM ══ -->
+    <div class="card" id="waiting">
+      <div class="session-info" id="sessionInfo"></div>
+      <div class="waiting-icon">⏳</div>
+      <p class="waiting-text">
+        <span class="pulse"></span>
+        Waiting for the teacher to start the round…
+      </p>
+    </div>
+
+    <!-- ══ ACTIVE ROUND ══ -->
+    <div class="card" id="active">
+      <div class="round-header">
+        <p class="badge">ROUND ACTIVE</p>
+        <p class="round-title" id="sessionNameLabel"></p>
+        <p class="round-sub">How are you following along?</p>
+      </div>
+
+      <div class="signal-grid">
+        <button class="signal-btn got"  onclick="selectSignal('got_it')"  id="btn_got_it">
+          <span class="signal-emoji">✅</span>
+          <span class="signal-label">
+            <span>Got it</span>
+            <span>I understand clearly</span>
+          </span>
+        </button>
+        <button class="signal-btn sort" onclick="selectSignal('sort_of')" id="btn_sort_of">
+          <span class="signal-emoji">🤔</span>
+          <span class="signal-label">
+            <span>Sort of</span>
+            <span>Mostly following along</span>
+          </span>
+        </button>
+        <button class="signal-btn lost" onclick="selectSignal('lost')"    id="btn_lost">
+          <span class="signal-emoji">🆘</span>
+          <span class="signal-label">
+            <span>Lost</span>
+            <span>Need more explanation</span>
+          </span>
+        </button>
+      </div>
+
+      <button class="submit-btn" id="submitBtn" onclick="submitSignal()" disabled>
+        Send signal
+      </button>
+
+      <div class="q-section">
+        <p class="q-label">Ask a question anonymously (optional)</p>
+        <textarea id="questionInput" placeholder="What confused you? Teacher will see top questions…"></textarea>
+        <button class="ask-btn" id="askBtn" onclick="submitQuestion()">Ask anonymously →</button>
+      </div>
+    </div>
+
+    <!-- ══ SUBMITTED ══ -->
+    <div class="card" id="submitted">
+      <div class="submitted-icon">🎉</div>
+      <p class="submitted-text">Response sent!<br />Waiting for the next round…</p>
+    </div>
+
+    <p class="footer">ClassPulse — anonymous classroom feedback</p>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+      import {
+        getFirestore, collection, query, where,
+        getDocs, doc, getDoc, setDoc, addDoc,
+        onSnapshot, serverTimestamp,
+      } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyB0lQ4kN9YBskuaNp-8AcOfTAfUYPbhSbU",
+        authDomain: "classpulse-97289.firebaseapp.com",
+        projectId: "classpulse-97289",
+        storageBucket: "classpulse-97289.firebasestorage.app",
+        messagingSenderId: "844668167541",
+        appId: "1:844668167541:web:dfd90a7024876a30d05f3c",
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db  = getFirestore(app);
+
+      // ── State ──
+      let sessionId            = null;
+      let selectedSig          = null;
+      let unsubscribe          = null;
+      let hasSubmittedThisRound = false;
+
+      // Anonymous student ID (persists for this browser tab)
+      const studentId = sessionStorage.getItem("studentId") || ("stu_" + Math.random().toString(36).slice(2, 10));
+      sessionStorage.setItem("studentId", studentId);
+
+      // ── Auto-connect from URL on page load ──
+      window.addEventListener("load", async () => {
+        const params         = new URLSearchParams(window.location.search);
+        const sessionFromUrl = params.get("session");
+        if (sessionFromUrl && sessionFromUrl.trim()) {
+          document.getElementById("joinBtn").textContent    = "Connecting…";
+          document.getElementById("joinBtn").disabled       = true;
+          document.getElementById("codeInput").disabled     = true;
+          await connectToSession(sessionFromUrl, true);
         }
+      });
 
-        if (!sessionDoc) {
-          errEl.textContent = 'Session not found. Try scanning the QR code again.';
-          errEl.style.display = 'block';
-          return;
+      // ── Manual join ──
+      window.joinSession = async function () {
+        const code    = document.getElementById("codeInput").value.trim();
+        const joinBtn = document.getElementById("joinBtn");
+        joinBtn.disabled    = true;
+        joinBtn.textContent = "Joining…";
+        await connectToSession(code, false);
+        // Re-enable if it failed
+        const errEl = document.getElementById("joinError");
+        if (errEl.style.display !== "none") {
+          joinBtn.disabled    = false;
+          joinBtn.textContent = "Join →";
         }
-      } else {
-        // Look up by 4-digit code (manual entry)
-        if (sessionIdOrCode.length !== 4 || isNaN(sessionIdOrCode)) {
-          errEl.textContent = 'Please enter a valid 4-digit code.';
-          errEl.style.display = 'block';
-          return;
-        }
-        sessionDoc = await findByCode(sessionIdOrCode);
-        if (!sessionDoc) {
-          errEl.textContent = 'Code not found. Check with your teacher.';
-          errEl.style.display = 'block';
-          return;
+      };
+
+      // ── Core connect logic ──
+      async function connectToSession(idOrCode, isDirectId) {
+        const errEl = document.getElementById("joinError");
+        errEl.style.display = "none";
+
+        try {
+          let sessionDoc = null;
+
+          if (isDirectId) {
+            // Try direct doc read first
+            const direct = await getDoc(doc(db, "sessions", idOrCode.trim()));
+            if (direct.exists()) {
+              sessionDoc = { id: direct.id, data: () => direct.data() };
+            } else {
+              // Fallback: query all and match id
+              const all = await getDocs(collection(db, "sessions"));
+              const match = all.docs.find(d => d.id === idOrCode.trim());
+              if (match) sessionDoc = { id: match.id, data: () => match.data() };
+            }
+          } else {
+            // Look up by 4-digit code
+            if (idOrCode.length !== 4 || isNaN(idOrCode)) {
+              errEl.textContent    = "Please enter a valid 4-digit code.";
+              errEl.style.display  = "block";
+              return;
+            }
+            const q    = query(collection(db, "sessions"), where("code", "==", idOrCode));
+            const snap = await getDocs(q);
+            if (!snap.empty) sessionDoc = { id: snap.docs[0].id, data: () => snap.docs[0].data() };
+          }
+
+          if (!sessionDoc) {
+            errEl.textContent   = "Session not found. Check the code and try again.";
+            errEl.style.display = "block";
+            return;
+          }
+
+          sessionId        = sessionDoc.id;
+          const data       = sessionDoc.data();
+
+          // Populate session info card
+          document.getElementById("sessionInfo").innerHTML = `
+            <p class="label">SESSION</p>
+            <p class="value">${data.sessionName}</p>
+            <p class="label" style="margin-top:10px">TEACHER</p>
+            <p class="value">${data.teacherName}</p>
+          `;
+          document.getElementById("sessionNameLabel").textContent = data.sessionName;
+
+          // Show waiting room
+          document.getElementById("joinScreen").style.display = "none";
+          document.getElementById("waiting").style.display    = "block";
+
+          // Update URL for deep-link / refresh
+          window.history.replaceState({}, "", `${window.location.pathname}?session=${encodeURIComponent(sessionId)}`);
+
+          // Start live listener
+          listenToSession(sessionId);
+
+        } catch (e) {
+          console.error(e);
+          errEl.textContent   = "Connection error. Try again.";
+          errEl.style.display = "block";
         }
       }
 
-      sessionId = sessionDoc.id;
-      const data = sessionDoc.data();
+      // ── Live listener ──
+      function listenToSession(sid) {
+        if (unsubscribe) unsubscribe();
 
-      // Show session info
-      document.getElementById('sessionInfo').innerHTML = `
-        <p class="label">SESSION</p>
-        <p class="value">${data.sessionName}</p>
-        <p class="label" style="margin-top:10px">TEACHER</p>
-        <p class="value">${data.teacherName}</p>
-      `;
-      document.getElementById('sessionNameLabel').textContent = data.sessionName;
+        unsubscribe = onSnapshot(doc(db, "sessions", sid), snap => {
+          if (!snap.exists()) return;
+          const data = snap.data();
 
-      // Switch screens immediately so the user sees progress.
-      document.getElementById('joinScreen').style.display = 'none';
-      document.getElementById('waiting').style.display = 'block';
+          if (data.active) {
+            document.getElementById("waiting").style.display   = "none";
+            document.getElementById("submitted").style.display = "none";
+            if (!hasSubmittedThisRound) {
+              document.getElementById("active").style.display  = "block";
+            }
+          } else {
+            // Round closed — reset for next round
+            hasSubmittedThisRound = false;
+            selectedSig           = null;
+            resetSignalButtons();
+            document.getElementById("submitBtn").disabled       = true;
+            document.getElementById("submitBtn").textContent    = "Send signal";
+            document.getElementById("active").style.display    = "none";
+            document.getElementById("submitted").style.display = "none";
+            document.getElementById("waiting").style.display   = "block";
+          }
+        });
+      }
 
-      // Keep URL in sync so refresh/deep-link works after manual join.
-      const nextUrl = `${window.location.pathname}?session=${encodeURIComponent(sessionId)}`;
-      window.history.replaceState({}, '', nextUrl);
-
-      // Listen for active state
-      listenToSession(sessionId);
-
-    } catch (e) {
-      console.error('Connection error:', e);
-      errEl.textContent = 'Connection error. Try again.';
-      errEl.style.display = 'block';
-    }
-  }
-
-  // ── Manual join from form submission ──
-  window.joinSession = async function () {
-    const code = document.getElementById('codeInput').value.trim();
-    const joinBtn = document.getElementById('joinBtn');
-
-    joinBtn.disabled = true;
-    joinBtn.textContent = 'Joining…';
-
-    await connectToSession(code, false);
-
-    // Re-enable button if connection failed
-    const errEl = document.getElementById('joinError');
-    if (errEl.style.display !== 'none') {
-      joinBtn.disabled = false;
-      joinBtn.textContent = 'Join →';
-    }
-  };
-
-  // ── Auto-connect from URL query param on page load ──
-  window.addEventListener('load', async function() {
-    const params = new URLSearchParams(window.location.search);
-    const sessionFromUrl = params.get('session');
-
-    if (sessionFromUrl && sessionFromUrl.trim()) {
-      // Show connecting state
-      const joinBtn = document.getElementById('joinBtn');
-      const codeInput = document.getElementById('codeInput');
-      joinBtn.textContent = 'Connecting…';
-      joinBtn.disabled = true;
-      codeInput.disabled = true;
-
-      // Auto-connect using the session ID from URL
-      await connectToSession(sessionFromUrl, true);
-    }
-  });
-
-  function listenToSession(sid) {
-    if (unsubscribe) unsubscribe();
-
-    unsubscribe = onSnapshot(doc(db, 'sessions', sid), (snap) => {
-      if (!snap.exists()) return;
-      const data = snap.data();
-
-      if (data.active) {
-        // Show active round
-        document.getElementById('waiting').style.display   = 'none';
-        document.getElementById('submitted').style.display = 'none';
-
-        if (!hasSubmittedThisRound) {
-          document.getElementById('active').style.display = 'block';
-        }
-      } else {
-        // Waiting room
-        hasSubmittedThisRound = false;
-        selectedSig = null;
+      // ── Signal selection ──
+      window.selectSignal = function (signal) {
+        selectedSig = signal;
         resetSignalButtons();
-        document.getElementById('submitBtn').disabled = true;
-        document.getElementById('active').style.display    = 'none';
-        document.getElementById('submitted').style.display = 'none';
-        document.getElementById('waiting').style.display   = 'block';
+        document.getElementById("btn_" + signal).classList.add("selected");
+        document.getElementById("submitBtn").disabled = false;
+      };
+
+      function resetSignalButtons() {
+        ["got_it", "sort_of", "lost"].forEach(s => {
+          document.getElementById("btn_" + s).classList.remove("selected");
+        });
       }
-    });
-  }
 
-  window.selectSignal = function(signal) {
-    selectedSig = signal;
-    resetSignalButtons();
-    document.getElementById('btn_' + signal).classList.add('selected');
-    document.getElementById('submitBtn').disabled = false;
-  };
+      // ── Submit signal ──
+      window.submitSignal = async function () {
+        if (!selectedSig || !sessionId) return;
 
-  function resetSignalButtons() {
-    ['got_it','sort_of','lost'].forEach(s => {
-      document.getElementById('btn_' + s).classList.remove('selected');
-    });
-  }
+        // Disable button only — no text change
+        document.getElementById("submitBtn").disabled = true;
 
-  window.submitSignal = async function() {
-    if (!selectedSig || !sessionId) return;
+        try {
+          await setDoc(doc(db, "sessions", sessionId, "students", studentId), {
+            signal:    selectedSig,
+            updatedAt: serverTimestamp(),
+          });
 
-    document.getElementById('submitBtn').disabled = true;
-    document.getElementById('submitBtn').textContent = 'Sending…';
+          hasSubmittedThisRound = true;
+          document.getElementById("active").style.display    = "none";
+          document.getElementById("submitted").style.display = "block";
+        } catch (e) {
+          // Re-enable on failure
+          document.getElementById("submitBtn").disabled = false;
+          alert("Could not send. Check your connection.");
+        }
+      };
 
-    try {
-      await setDoc(doc(db, 'sessions', sessionId, 'students', studentId), {
-        signal: selectedSig,
-        updatedAt: serverTimestamp(),
+      // ── Submit question ──
+      window.submitQuestion = async function () {
+        const text   = document.getElementById("questionInput").value.trim();
+        const askBtn = document.getElementById("askBtn");
+        if (!text || !sessionId) return;
+
+        try {
+          await addDoc(collection(db, "sessions", sessionId, "questions"), {
+            text,
+            upvotes:   0,
+            askedAt:   serverTimestamp(),
+            studentId,
+          });
+          document.getElementById("questionInput").value = "";
+          askBtn.textContent = "✅ Question sent!";
+          setTimeout(() => { askBtn.textContent = "Ask anonymously →"; }, 2000);
+        } catch (e) {
+          alert("Could not send question. Try again.");
+        }
+      };
+
+      // Enter key to join
+      document.getElementById("codeInput").addEventListener("keydown", e => {
+        if (e.key === "Enter") window.joinSession();
       });
-
-      hasSubmittedThisRound = true;
-      document.getElementById('active').style.display    = 'none';
-      document.getElementById('submitted').style.display = 'block';
-    } catch(e) {
-      document.getElementById('submitBtn').disabled = false;
-      document.getElementById('submitBtn').textContent = 'Send signal';
-      alert('Could not send. Check your connection.');
-    }
-  };
-
-  window.submitQuestion = async function() {
-    const text = document.getElementById('questionInput').value.trim();
-    if (!text || !sessionId) return;
-
-    try {
-      await addDoc(collection(db, 'sessions', sessionId, 'questions'), {
-        text,
-        upvotes: 0,
-        askedAt: serverTimestamp(),
-        studentId,
-      });
-      document.getElementById('questionInput').value = '';
-      document.querySelector('.ask-btn').textContent = '✅ Question sent!';
-      setTimeout(() => {
-        document.querySelector('.ask-btn').textContent = 'Ask anonymously →';
-      }, 2000);
-    } catch(e) {
-      alert('Could not send question. Try again.');
-    }
-  };
-
-  // Allow pressing Enter to join
-  document.getElementById('codeInput').addEventListener('keydown', e => {
-    if (e.key === 'Enter') window.joinSession();
-  });
-</script>
-
-</body>
+    </script>
+  </body>
 </html>
