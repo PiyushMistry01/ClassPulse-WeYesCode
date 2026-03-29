@@ -15,6 +15,7 @@ type SessionParams = {
   sessionName: string;
   teacherName: string;
   alertThreshold: string;
+  isOffline: string;
 };
 
 export default function SessionCode() {
@@ -23,6 +24,7 @@ export default function SessionCode() {
   const [params, setParams] = useState<SessionParams | null>(null);
   const [activating, setActivating] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const isOffline = params?.isOffline === 'true';
   const studentUrl = params
   ? `https://classpulse-97289.web.app/student.html?session=${encodeURIComponent(params.sessionId)}`
   : '';
@@ -113,6 +115,13 @@ export default function SessionCode() {
           <Text style={styles.title}>{params!.sessionName}</Text>
           <Text style={styles.subtitle}>Share this with your students</Text>
         </View>
+
+        {/* Offline badge — ADD THIS HERE */}
+{isOffline && (
+  <View style={styles.offlineBadge}>
+    <Text style={styles.offlineBadgeText}>📶 Offline Mode — Hotspot session</Text>
+  </View>
+)}
 
         {/* QR Code card */}
         <View style={styles.qrCard}>
@@ -365,4 +374,20 @@ const styles = StyleSheet.create({
     color: '#AEACA6',
     textAlign: 'center',
   },
+  offlineBadge: {
+  backgroundColor: '#E1F5EE',
+  borderRadius: 10,
+  paddingVertical: 10,
+  paddingHorizontal: 14,
+  marginBottom: 16,
+  borderWidth: 1,
+  borderColor: '#9FE1CB',
+  width: '100%',
+  alignItems: 'center',
+},
+offlineBadgeText: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: '#085041',
+},
 });

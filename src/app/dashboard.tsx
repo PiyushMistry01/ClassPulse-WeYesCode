@@ -226,7 +226,6 @@ export default function Dashboard() {
     return () => { s1(); s2(); s3(); };
   }, [session]);
 
-  // AI question grouping
   useEffect(() => {
   if (!session || rawQuestions.length === 0) { setGroupedQs([]); return; }
   if (rawQuestions.length === lastQCount.current) return;

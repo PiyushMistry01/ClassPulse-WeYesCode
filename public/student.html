@@ -899,63 +899,26 @@
         askBtn.textContent = "Sending…";
 
         try {
-          const apiBaseUrl = (window.location.protocol === "file:")
-            ? "http://192.168.0.144:3001"
-            : `${window.location.protocol}//${window.location.hostname}:3001`;
 
-          const validateRes = await fetch(`${apiBaseUrl}/validate-question`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              question: text,
-              contextRaw: currentContextRaw,
-              contextTopics: currentContextTopics,
-              contextSummary: currentContextSummary || currentContextRaw,
-            }),
-          });
+    // Directly save question to Firestore
+    await addDoc(collection(db, "sessions", sessionId, "questions"), {
+      text: text,
+      upvotes: 0,
+      askedAt: serverTimestamp(),
+      studentId: studentId
+    });
 
-          if (!validateRes.ok) {
-            qError.textContent = "Could not validate question right now. Please try again.";
-            qError.style.display = "block";
-            askBtn.disabled = false;
-            askBtn.textContent = "Send question →";
-            return;
-          }
+    document.getElementById("qSent").style.display = "block";
+    askBtn.textContent = "✓ Sent";
+    input.value = "";
 
-          const validation = await validateRes.json();
-          if (validation?.isRelevant !== true) {
-            qError.textContent = "Question not related to current class context, so it was not sent.";
-            qError.style.display = "block";
-            askBtn.disabled = false;
-            askBtn.textContent = "Send question →";
-            return;
-          }
-
-          await addDoc(collection(db, "sessions", sessionId, "questions"), {
-            text,
-            upvotes: 0,
-            askedAt: serverTimestamp(),
-            studentId,
-          });
-
-          document.getElementById("qSent").style.display = "block";
-          askBtn.textContent = "✓ Sent!";
-          input.value = "";
-
-          setTimeout(() => {
-            askBtn.disabled    = false;
-            askBtn.textContent = "Send question →";
-          }, 3000);
-
-        } catch (e) {
-          const msg = e?.message || e?.code || JSON.stringify(e) || "Unknown error";
-          qError.textContent   = "Failed to send: " + msg;
-          qError.style.display = "block";
-
-          askBtn.disabled    = false;
-          askBtn.textContent = "Send question →";
-        }
-      };
+  } catch (e) {
+    console.error("Question save failed:", e);
+    alert("Could not send question. Try again.");
+    askBtn.disabled    = false;
+    askBtn.textContent = "Submit question →";
+  }
+};
 
       // Enter key to join
       document.getElementById("codeInput").addEventListener("keydown", e => {
