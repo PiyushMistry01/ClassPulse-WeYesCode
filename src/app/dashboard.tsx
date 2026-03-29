@@ -6,14 +6,16 @@ import {
     ActivityIndicator,
     Alert,
     Modal,
-    Platform,
     SafeAreaView, ScrollView,
     StyleSheet,
     Text, TouchableOpacity,
     Vibration,
     View
 } from 'react-native';
+import LanguageSwitcher from '../components/language-switcher';
 import { db } from '../firebase';
+import { useI18n } from '../hooks/use-i18n';
+import { fetchApi } from '../utils/api-base-url';
 
 // TODO: move to env before making repo public
 const ANTHROPIC_KEY = 'YOUR-NEW-KEY-HERE';
@@ -22,11 +24,23 @@ type Signal = 'got_it' | 'sort_of' | 'lost';
 type StudentData = { signal: Signal };
 
 type RawQuestion = {
-  id: string; text: string; upvotes: number; studentId: string; askedAt: any;
+  id: string;
+  text: string;
+  count: number;
+  lastAskedAt: any;
+  askedAt: any;
+  upvotes?: number;
+  studentIds?: string[];
+  studentId?: string;
 };
 
 type GroupedQuestion = {
-  representativeText: string; count: number; upvotes: number; priority: number; ids: string[];
+  representativeText: string;
+  count: number;
+  upvotes: number;
+  priority: number;
+  ids: string[];
+  lastAskedAt?: any;
 };
 
 type SessionData = {
@@ -41,72 +55,125 @@ type SessionContext = {
   contextPurpose: string;
 };
 
+type McqQuestion = {
+  question: string;
+  options: string[];
+  correctAnswer: string;
+};
+
 function getQuizApiUrl(): string | null {
-  if (Platform.OS === 'web') {
-    return '/generate-quiz';
-  }
-
-  const base = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
-  if (!base) {
-    return null;
-  }
-
-  const normalized = base.endsWith('/') ? base.slice(0, -1) : base;
-  return `${normalized}/generate-quiz`;
+  return '/generate-quiz';
 }
 
 async function groupAndFilterQuestions(questions: RawQuestion[], sessionTopic: string): Promise<GroupedQuestion[]> {
   if (questions.length === 0) return [];
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type':      'application/json',
-        'x-api-key':         ANTHROPIC_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{
-          role: 'user',
-          content: `You are helping a teacher manage student questions during a class on: "${sessionTopic}".
 
-Here are the student questions (JSON):
-${JSON.stringify(questions.map(q => ({ id: q.id, text: q.text, upvotes: q.upvotes })))}
+  try {
+    // Transform questions to grouped format with count-based priority
+    // Priority = (count * 100) + recency boost
+    const transformed: GroupedQuestion[] = questions.map((q) => {
+      const count = q.count || 1;
+      const recencyBoost = q.lastAskedAt?.toDate
+        ? (new Date(q.lastAskedAt.toDate()).getTime() - Date.now()) / 1000000
+        : 0;
+
+      return {
+        representativeText: q.text,
+        count: count,
+        upvotes: q.upvotes || 0,
+        priority: count * 100 + recencyBoost,
+        ids: [q.id],
+        lastAskedAt: q.lastAskedAt,
+      };
+    });
+
+    // Sort by priority (descending) - highest count = highest priority
+    transformed.sort((a, b) => b.priority - a.priority);
+
+    // Optional: Use AI to filter out off-topic questions and provide intelligent grouping
+    // Only if ANTHROPIC_KEY is available and not a placeholder
+    if (ANTHROPIC_KEY && ANTHROPIC_KEY !== 'YOUR-NEW-KEY-HERE' && sessionTopic) {
+      try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': ANTHROPIC_KEY,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1500,
+            messages: [
+              {
+                role: 'user',
+                content: `You are helping a teacher manage student questions during a class on: "${sessionTopic}".
+
+Here are the student questions with frequency counts (JSON):
+${JSON.stringify(
+  transformed.map((q) => ({
+    id: q.ids[0],
+    text: q.representativeText,
+    count: q.count,
+    priority: q.priority.toFixed(2),
+  }))
+)}
 
 Your tasks:
 1. DISCARD any questions NOT related to "${sessionTopic}" — silently remove them.
-2. GROUP questions that share the same concept or keywords together.
-3. For each group, pick the CLEAREST and most complete question as the representative.
-4. Calculate priority = (number of similar questions * 2) + upvotes.
-5. Sort by priority DESCENDING — highest priority FIRST (position #1 in queue).
+2. Each question already has a count showing how many times students asked it (higher = more important).
+3. KEEP the count and priority values AS-IS (do not recalculate).
+4. Return sorted by priority DESCENDING (already sorted for you).
 
 Rules:
-- If only 1 question in a group, count = 1.
 - Never invent questions. Only use what students actually asked.
 - Discard greetings, random text, or anything unrelated to the topic.
+- RESPECT the frequency count — a question asked 5 times is more important than one asked once.
 
 Respond ONLY with a valid JSON array. No markdown, no explanation:
-[{"representativeText":"...","count":2,"upvotes":3,"priority":7,"ids":["id1","id2"]}]`
-        }]
-      })
-    });
-    const data  = await response.json();
-    const raw   = data.content?.find((c: any) => c.type === 'text')?.text || '[]';
-    const clean = raw.replace(/```json|```/g, '').trim();
-    return JSON.parse(clean) as GroupedQuestion[];
+[{"representativeText":"...","count":2,"upvotes":0,"priority":200.5,"ids":["id1"]}]`,
+              },
+            ],
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const raw = data.content?.find((c: any) => c.type === 'text')?.text || '[]';
+          const clean = raw.replace(/```json|```/g, '').trim();
+          const filtered = JSON.parse(clean) as GroupedQuestion[];
+
+          // Verify it's valid
+          if (Array.isArray(filtered) && filtered.length > 0) {
+            console.log(`[Dashboard] AI filtered ${questions.length} → ${filtered.length} relevant questions`);
+            return filtered;
+          }
+        }
+      } catch (aiError) {
+        console.warn('[Dashboard] AI filtering failed, using local sort:', aiError);
+      }
+    }
+
+    return transformed;
   } catch (e) {
-    console.error('AI grouping failed:', e);
-    return questions.map(q => ({
-      representativeText: q.text, count: 1,
-      upvotes: q.upvotes || 0, priority: q.upvotes || 0, ids: [q.id],
-    })).sort((a, b) => b.priority - a.priority);
+    console.error('[Dashboard] Question grouping failed:', e);
+    // Fallback: return questions sorted by count
+    return questions
+      .map((q) => ({
+        representativeText: q.text,
+        count: q.count || 1,
+        upvotes: q.upvotes || 0,
+        priority: (q.count || 1) * 100,
+        ids: [q.id],
+        lastAskedAt: q.lastAskedAt,
+      }))
+      .sort((a, b) => b.priority - a.priority);
   }
 }
 
 export default function Dashboard() {
   const router = useRouter();
+  const { i18n } = useI18n();
   const [session, setSession]               = useState<SessionData | null>(null);
   const [active, setActive]                 = useState(false);
   const [students, setStudents]             = useState<Record<string, StudentData>>({});
@@ -127,7 +194,7 @@ export default function Dashboard() {
   const [quizModalVisible, setQuizModalVisible] = useState(false);
   const [quizGenerating, setQuizGenerating] = useState(false);
   const [quizSending, setQuizSending] = useState(false);
-  const [generatedQuiz, setGeneratedQuiz] = useState<string[]>([]);
+  const [generatedQuiz, setGeneratedQuiz] = useState<McqQuestion[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastQCount = useRef(0);
 
@@ -220,27 +287,37 @@ export default function Dashboard() {
     });
     const s3 = onSnapshot(collection(db, 'sessions', session.sessionId, 'questions'), snap => {
       const qs: RawQuestion[] = [];
-      snap.forEach(d => qs.push({ id: d.id, ...d.data() } as RawQuestion));
+      snap.forEach(d => {
+        const data = d.data();
+        qs.push({
+          id: d.id,
+          text: data.text || '',
+          count: data.count || 1,
+          lastAskedAt: data.lastAskedAt,
+          askedAt: data.askedAt,
+          upvotes: data.upvotes || 0,
+          studentIds: data.studentIds || [],
+          studentId: data.studentId || '',
+        });
+      });
       setRawQuestions(qs);
     });
     return () => { s1(); s2(); s3(); };
   }, [session]);
 
+  // AI question grouping and prioritization
   useEffect(() => {
-  if (!session || rawQuestions.length === 0) { setGroupedQs([]); return; }
-  if (rawQuestions.length === lastQCount.current) return;
-  lastQCount.current = rawQuestions.length;
+    if (!session || rawQuestions.length === 0) {
+      setGroupedQs([]);
+      return;
+    }
 
-  // Bypass AI — show raw questions directly
-  const raw = rawQuestions.map(q => ({
-    representativeText: q.text,
-    count: 1,
-    upvotes: q.upvotes || 0,
-    priority: 1,
-    ids: [q.id],
-  }));
-  setGroupedQs(raw);
-}, [rawQuestions.length]);
+    // Call grouping function whenever questions change
+    groupAndFilterQuestions(
+      rawQuestions,
+      session.sessionName || sessionContext.contextSummary
+    ).then(setGroupedQs);
+  }, [rawQuestions, session?.sessionName, sessionContext.contextSummary]);
 
   // Lost % vibration alert
   useEffect(() => {
@@ -300,9 +377,9 @@ export default function Dashboard() {
   }
 
   async function endSession() {
-    Alert.alert('End Session?', 'This will close the session for all students.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'End', style: 'destructive', onPress: async () => {
+    Alert.alert(i18n.t('endSessionTitle'), i18n.t('endSessionBody'), [
+      { text: i18n.t('cancel'), style: 'cancel' },
+      { text: i18n.t('end'), style: 'destructive', onPress: async () => {
         if (!session) return;
         await updateDoc(doc(db, 'sessions', session.sessionId), { active: false, ended: true });
         await AsyncStorage.removeItem('currentSession');
@@ -315,7 +392,7 @@ export default function Dashboard() {
     if (!session) return;
 
     if (!sessionContext.contextRaw && !sessionContext.contextSummary && !sessionContext.contextTopics.length) {
-      Alert.alert('Context Required', 'Add teaching context when creating session, then generate quiz.');
+      Alert.alert(i18n.t('contextRequiredTitle'), i18n.t('contextRequiredBody'));
       return;
     }
 
@@ -324,16 +401,17 @@ export default function Dashboard() {
       const apiUrl = getQuizApiUrl();
       if (!apiUrl) {
         Alert.alert(
-          'Configuration Required',
-          'Set EXPO_PUBLIC_API_BASE_URL for native builds to enable AI quiz generation.'
+          i18n.t('configRequiredTitle'),
+          i18n.t('configRequiredBody')
         );
         return;
       }
 
-      const response = await fetch(apiUrl, {
+      const response = await fetchApi(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          responseFormat: 'mcq',
           contextRaw: sessionContext.contextRaw,
           contextTopics: sessionContext.contextTopics,
           contextSummary: sessionContext.contextSummary,
@@ -356,11 +434,21 @@ export default function Dashboard() {
 
       const data = (await response.json()) as { questions?: unknown };
       const questions = Array.isArray(data.questions)
-        ? data.questions.filter((q): q is string => typeof q === 'string').slice(0, 5)
+        ? data.questions
+            .filter((q): q is McqQuestion => {
+              return (
+                !!q &&
+                typeof (q as McqQuestion).question === 'string' &&
+                Array.isArray((q as McqQuestion).options) &&
+                (q as McqQuestion).options.length === 4 &&
+                typeof (q as McqQuestion).correctAnswer === 'string'
+              );
+            })
+            .slice(0, 5)
         : [];
 
       if (!questions.length) {
-        Alert.alert('No Quiz Generated', 'AI could not generate quiz questions from this context.');
+        Alert.alert(i18n.t('noQuizTitle'), i18n.t('noQuizBody'));
         return;
       }
 
@@ -371,8 +459,8 @@ export default function Dashboard() {
       const message =
         error instanceof Error && error.message
           ? error.message
-          : 'Could not generate quiz right now. Please try again.';
-      Alert.alert('Generation Failed', message);
+          : i18n.t('generationFailedBody');
+      Alert.alert(i18n.t('generationFailedTitle'), message);
     } finally {
       setQuizGenerating(false);
     }
@@ -385,7 +473,13 @@ export default function Dashboard() {
     try {
       await updateDoc(doc(db, 'sessions', session.sessionId), {
         activeQuiz: {
-          questions: generatedQuiz.map((text, index) => ({ id: `q${index + 1}`, text })),
+          questions: generatedQuiz.map((item, index) => ({
+            id: `q${index + 1}`,
+            text: item.question,
+            question: item.question,
+            options: item.options,
+            correctAnswer: item.correctAnswer,
+          })),
           createdAt: Date.now(),
           source: 'ai-context',
         },
@@ -393,17 +487,17 @@ export default function Dashboard() {
       });
 
       setQuizModalVisible(false);
-      Alert.alert('Quiz Sent', 'Quiz has been sent to students.');
+      Alert.alert(i18n.t('quizSentTitle'), i18n.t('quizSentBody'));
     } catch (error) {
       console.error('Send quiz failed:', error);
-      Alert.alert('Send Failed', 'Could not send quiz to students.');
+      Alert.alert(i18n.t('sendFailedTitle'), i18n.t('sendFailedBody'));
     } finally {
       setQuizSending(false);
     }
   }
 
   if (!session) return (
-    <SafeAreaView style={s.safe}><View style={s.centered}><Text style={s.muted}>Loading…</Text></View></SafeAreaView>
+    <SafeAreaView style={s.safe}><View style={s.centered}><Text style={s.muted}>{i18n.t('loading')}</Text></View></SafeAreaView>
   );
 
   return (
@@ -414,13 +508,13 @@ export default function Dashboard() {
         <View style={s.overlay}>
           <View style={s.modalCard}>
             <Text style={s.modalIcon}>⏰</Text>
-            <Text style={s.modalTitle}>Time's up!</Text>
-            <Text style={s.modalSub}>{session.alertMins} minutes have passed.{'\n'}Activate round for students?</Text>
+            <Text style={s.modalTitle}>{i18n.t('timesUp')}</Text>
+            <Text style={s.modalSub}>{i18n.t('minutesPassedActivate', { mins: session.alertMins })}</Text>
             <TouchableOpacity style={s.activateBtn} onPress={activateNow}>
-              <Text style={s.activateBtnText}>Activate Round Now →</Text>
+              <Text style={s.activateBtnText}>{i18n.t('activateRoundNow')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.snoozeBtn} onPress={resetTimer}>
-              <Text style={s.snoozeBtnText}>Snooze (restart timer)</Text>
+              <Text style={s.snoozeBtnText}>{i18n.t('snoozeRestart')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -429,14 +523,17 @@ export default function Dashboard() {
       <Modal visible={quizModalVisible} transparent animationType="slide" onRequestClose={() => setQuizModalVisible(false)}>
         <View style={s.overlay}>
           <View style={s.quizModalCard}>
-            <Text style={s.modalTitle}>AI Quiz Preview</Text>
-            <Text style={s.modalSub}>Review before sending to students</Text>
+            <Text style={s.modalTitle}>{i18n.t('aiQuizPreview')}</Text>
+            <Text style={s.modalSub}>{i18n.t('reviewBeforeSending')}</Text>
 
             <ScrollView style={s.quizList} contentContainerStyle={s.quizListContent}>
               {generatedQuiz.map((question, index) => (
-                <View key={`${index}-${question}`} style={s.quizQuestionCard}>
+                <View key={`${index}-${question.question}`} style={s.quizQuestionCard}>
                   <Text style={s.quizQuestionIndex}>Q{index + 1}</Text>
-                  <Text style={s.quizQuestionText}>{question}</Text>
+                  <Text style={s.quizQuestionText}>{question.question}</Text>
+                  {question.options.map((option, optionIndex) => (
+                    <Text key={`${index}-o-${optionIndex}`} style={s.quizHint}>{String.fromCharCode(65 + optionIndex)}. {option}</Text>
+                  ))}
                 </View>
               ))}
             </ScrollView>
@@ -446,27 +543,28 @@ export default function Dashboard() {
               onPress={handleSendQuizToStudents}
               disabled={quizSending}
             >
-              <Text style={s.activateBtnText}>{quizSending ? 'Sending…' : 'Send To Students →'}</Text>
+              <Text style={s.activateBtnText}>{quizSending ? i18n.t('sending') : i18n.t('sendToStudents')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={s.snoozeBtn} onPress={() => setQuizModalVisible(false)} disabled={quizSending}>
-              <Text style={s.snoozeBtnText}>Close</Text>
+              <Text style={s.snoozeBtnText}>{i18n.t('close')}</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
       <ScrollView contentContainerStyle={s.scroll}>
+        <LanguageSwitcher />
 
         {/* Header */}
         <View style={s.header}>
           <View style={{ flex: 1 }}>
-            <Text style={s.liveBadge}>● LIVE</Text>
+            <Text style={s.liveBadge}>{`● ${i18n.t('live')}`}</Text>
             <Text style={s.title}>{session.sessionName}</Text>
-            <Text style={s.sub}>Code {session.code} · {session.teacherName}</Text>
+            <Text style={s.sub}>{i18n.t('codeAndTeacher', { code: session.code, teacher: session.teacherName })}</Text>
           </View>
           <TouchableOpacity style={s.endBtn} onPress={endSession}>
-            <Text style={s.endBtnText}>End</Text>
+            <Text style={s.endBtnText}>{i18n.t('end')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -475,12 +573,12 @@ export default function Dashboard() {
           <View>
             <Text style={s.timerLabel}>
               {active
-                ? 'ROUND ACTIVE'
+                ? i18n.t('roundActive')
                 : !roundEverStarted
-                  ? 'START A ROUND TO BEGIN'   // ✅ New label for pre-first-round state
+                  ? i18n.t('startRoundToBegin')   // ✅ New label for pre-first-round state
                   : timerRunning
-                    ? 'NEXT CHECK-IN'
-                    : 'TIMER READY'}
+                    ? i18n.t('nextCheckIn')
+                    : i18n.t('timerReady')}
             </Text>
             <Text style={[s.timerValue, { color: tColor }]}>
               {active || !roundEverStarted ? '—  —' : `${mm}:${ss}`}
@@ -489,14 +587,14 @@ export default function Dashboard() {
           <View style={s.timerRight}>
             <Text style={s.timerHint}>
               {active
-                ? 'Paused during round'
+                ? i18n.t('pausedDuringRound')
                 : !roundEverStarted
-                  ? 'Tap ▶ Start Round below'   // ✅ Hint guiding teacher
-                  : `Every ${session.alertMins} min`}
+                  ? i18n.t('tapStartRound')   // ✅ Hint guiding teacher
+                  : i18n.t('everyMin', { mins: session.alertMins })}
             </Text>
             {!active && roundEverStarted && (
               <TouchableOpacity style={s.resetBtn} onPress={resetTimer}>
-                <Text style={s.resetBtnText}>↺ Reset</Text>
+                <Text style={s.resetBtnText}>{`↺ ${i18n.t('reset')}`}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -505,17 +603,21 @@ export default function Dashboard() {
         {/* Lost alert */}
         {isAlert && (
           <View style={s.alertBanner}>
-            <Text style={s.alertText}>⚠️  {lostPct}% of students are lost!</Text>
+            <Text style={s.alertText}>{`⚠️  ${i18n.t('studentsLostBanner', { pct: lostPct })}`}</Text>
           </View>
         )}
 
         {/* Stats */}
         <View style={s.statsRow}>
-          <StatCard label="Got it"  count={counts.got}  pct={total > 0 ? Math.round(counts.got/total*100)  : 0} color="#1D9E75" bg="#E1F5EE" />
-          <StatCard label="Sort of" count={counts.sort} pct={total > 0 ? Math.round(counts.sort/total*100) : 0} color="#C48A00" bg="#FDF3DC" />
-          <StatCard label="Lost"    count={counts.lost} pct={lostPct} color="#D85A30" bg="#FDECEA" />
+          <StatCard label={i18n.t('gotIt')}  count={counts.got}  pct={total > 0 ? Math.round(counts.got/total*100)  : 0} color="#1D9E75" bg="#E1F5EE" />
+          <StatCard label={i18n.t('sortOf')} count={counts.sort} pct={total > 0 ? Math.round(counts.sort/total*100) : 0} color="#C48A00" bg="#FDF3DC" />
+          <StatCard label={i18n.t('lost')}    count={counts.lost} pct={lostPct} color="#D85A30" bg="#FDECEA" />
         </View>
-        <Text style={s.totalText}>{total} student{total !== 1 ? 's' : ''} responded</Text>
+        <Text style={s.totalText}>
+          {total === 1
+            ? i18n.t('studentsResponded', { count: total })
+            : i18n.t('studentsRespondedPlural', { count: total })}
+        </Text>
 
         {total > 0 && (
           <View style={s.barTrack}>
@@ -528,11 +630,11 @@ export default function Dashboard() {
         {/* Round button */}
         <TouchableOpacity style={[s.roundBtn, active ? s.roundActive : s.roundInactive]} onPress={toggleRound}>
           <Text style={[s.roundText, active ? s.roundTextActive : s.roundTextInactive]}>
-            {active ? '⏹  Close Round' : '▶  Start Round'}
+            {active ? `⏹  ${i18n.t('closeRound')}` : `▶  ${i18n.t('startRound')}`}
           </Text>
         </TouchableOpacity>
         <Text style={s.roundHint}>
-          {active ? 'Students can send their signal now' : 'Tap to open — students respond instantly'}
+          {active ? i18n.t('studentsCanSendSignal') : i18n.t('tapToOpenRespond')}
         </Text>
 
         <TouchableOpacity
@@ -540,23 +642,29 @@ export default function Dashboard() {
           onPress={handleGenerateQuiz}
           disabled={quizGenerating}
         >
-          {quizGenerating ? <ActivityIndicator color="#F7F5F0" /> : <Text style={s.quizBtnText}>Generate AI Quiz (5 Questions)</Text>}
+          {quizGenerating ? <ActivityIndicator color="#F7F5F0" /> : <Text style={s.quizBtnText}>{i18n.t('generateAiQuiz')}</Text>}
         </TouchableOpacity>
 
-        <Text style={s.quizHint}>Quiz is generated from the faculty teaching context and shown before sending.</Text>
+        <Text style={s.quizHint}>{i18n.t('quizGeneratedHint')}</Text>
 
         {/* Questions */}
         <View style={s.qHeader}>
-          <Text style={s.qTitle}>STUDENT QUESTIONS</Text>
+          <Text style={s.qTitle}>{i18n.t('studentQuestions')}</Text>
           <Text style={s.qSub}>
-            {processing ? '🤖 AI analyzing…' : groupedQs.length > 0 ? `${groupedQs.length} group${groupedQs.length !== 1 ? 's' : ''}` : ''}
+            {processing
+              ? `🤖 ${i18n.t('aiAnalyzing')}`
+              : groupedQs.length > 0
+                ? groupedQs.length === 1
+                  ? i18n.t('groupsCount', { count: groupedQs.length })
+                  : i18n.t('groupsCountPlural', { count: groupedQs.length })
+                : ''}
           </Text>
         </View>
 
         {groupedQs.length === 0 && !processing && (
           <View style={s.emptyBox}>
-            <Text style={s.emptyText}>No questions yet</Text>
-            <Text style={s.emptyHint}>Students can ask questions during an active round</Text>
+            <Text style={s.emptyText}>{i18n.t('noQuestionsYet')}</Text>
+            <Text style={s.emptyHint}>{i18n.t('studentsCanAskDuringRound')}</Text>
           </View>
         )}
 
@@ -566,16 +674,16 @@ export default function Dashboard() {
               <Text style={[s.rankText, i === 0 && s.rankTextTop]}>#{i + 1}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              {i === 0 && <Text style={s.topLabel}>Highest Priority</Text>}
+              {i === 0 && <Text style={s.topLabel}>{i18n.t('highestPriority')}</Text>}
               <Text style={s.qText}>{q.representativeText}</Text>
               <View style={s.qTags}>
                 {q.count > 1 && (
-                  <View style={s.tagGreen}><Text style={s.tagGreenText}>👥 {q.count} students asked this</Text></View>
+                  <View style={s.tagGreen}><Text style={s.tagGreenText}>{`👥 ${i18n.t('studentsAskedThis', { count: q.count })}`}</Text></View>
                 )}
                 {q.upvotes > 0 && (
-                  <View style={s.tagYellow}><Text style={s.tagYellowText}>👍 {q.upvotes} upvotes</Text></View>
+                  <View style={s.tagYellow}><Text style={s.tagYellowText}>{`👍 ${i18n.t('upvotes', { count: q.upvotes })}`}</Text></View>
                 )}
-                <View style={s.tagPurple}><Text style={s.tagPurpleText}>⚡ priority {q.priority}</Text></View>
+                <View style={s.tagPurple}><Text style={s.tagPurpleText}>{`⚡ ${i18n.t('priority', { value: q.priority })}`}</Text></View>
               </View>
             </View>
           </View>

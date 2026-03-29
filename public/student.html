@@ -17,6 +17,49 @@
         align-items: center;
         justify-content: center;
         padding: 24px;
+        padding-top: 84px;
+      }
+
+      .lang-bar {
+        position: fixed;
+        top: 14px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(420px, calc(100% - 28px));
+        background: #fff;
+        border: 1px solid #e0ddd7;
+        border-radius: 12px;
+        padding: 8px 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        z-index: 200;
+      }
+
+      .lang-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: #444441;
+        letter-spacing: 0.3px;
+      }
+
+      .lang-actions { display: flex; gap: 6px; }
+
+      .lang-btn {
+        border: 1px solid #d3d0c8;
+        border-radius: 14px;
+        background: #fff;
+        color: #1a1a18;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 5px 9px;
+        cursor: pointer;
+      }
+
+      .lang-btn.active {
+        background: #1a1a18;
+        color: #f7f5f0;
+        border-color: #1a1a18;
       }
 
       .card {
@@ -322,6 +365,212 @@
         margin-bottom: 8px;
       }
 
+      .student-quiz-question {
+        background: #f7f5f0;
+        border: 1px solid #e0ddd7;
+        border-radius: 12px;
+        padding: 12px;
+        margin-bottom: 10px;
+      }
+
+      .student-quiz-question p {
+        font-size: 13px;
+        font-weight: 600;
+        color: #1a1a18;
+        margin-bottom: 8px;
+      }
+
+      .student-quiz-option {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        font-size: 13px;
+        color: #1a1a18;
+        padding: 6px 0;
+      }
+
+      .student-quiz-actions {
+        margin-top: 8px;
+      }
+
+      .student-quiz-status {
+        display: none;
+        margin-top: 10px;
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .student-quiz-status.visible { display: block; }
+      .student-quiz-status.good { background: #e1f5ee; color: #0f6e56; }
+      .student-quiz-status.bad { background: #fdecea; color: #d85a30; }
+
+      .checkpoint-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(26, 26, 24, 0.62);
+        z-index: 130;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+
+      .checkpoint-overlay.visible { display: flex; }
+
+      .checkpoint-card {
+        background: #fff;
+        border-radius: 18px;
+        width: 100%;
+        max-width: 420px;
+        padding: 16px 14px;
+        max-height: 84vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 14px 48px rgba(0, 0, 0, 0.22);
+      }
+
+      .checkpoint-badge {
+        font-size: 11px;
+        letter-spacing: 1.8px;
+        color: #c48a00;
+        font-weight: 700;
+        margin-bottom: 10px;
+      }
+
+      .checkpoint-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: #1a1a18;
+        margin-bottom: 8px;
+      }
+
+      .checkpoint-subtitle {
+        font-size: 14px;
+        color: #888780;
+        line-height: 20px;
+        margin-bottom: 18px;
+      }
+
+      #checkpointBody {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+
+      .checkpoint-progress {
+        font-size: 12px;
+        font-weight: 700;
+        color: #aeaca6;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+      }
+
+      .checkpoint-question-block {
+        padding: 14px 0 16px;
+        border-top: 1px solid #f0ede7;
+      }
+
+      .checkpoint-question-block:first-child {
+        border-top: none;
+        padding-top: 0;
+      }
+
+      .checkpoint-question {
+        font-size: 16px;
+        font-weight: 600;
+        color: #1a1a18;
+        line-height: 24px;
+        margin-bottom: 14px;
+      }
+
+      .checkpoint-options {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .checkpoint-option {
+        width: 100%;
+        border: 1.5px solid #e0ddd7;
+        border-radius: 14px;
+        background: #f7f5f0;
+        color: #1a1a18;
+        padding: 14px 16px;
+        text-align: left;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: border-color 0.15s, transform 0.15s, background 0.15s, box-shadow 0.15s;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+      }
+
+      .checkpoint-option:hover { border-color: #c48a00; }
+      .checkpoint-option:active { transform: scale(0.98); }
+      .checkpoint-option input {
+        margin-top: 2px;
+        accent-color: #c48a00;
+        flex-shrink: 0;
+      }
+      .checkpoint-option.selected {
+        border-color: #c48a00;
+        box-shadow: 0 0 0 3px rgba(196, 138, 0, 0.12);
+      }
+      .checkpoint-option.correct { border-color: #0f6e56; background: #e1f5ee; color: #0f6e56; }
+      .checkpoint-option.incorrect { border-color: #d85a30; background: #fdecea; color: #d85a30; }
+      .checkpoint-option.locked { cursor: default; }
+
+      .checkpoint-actions {
+        margin-top: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .checkpoint-submit {
+        width: 100%;
+        background: #1a1a18;
+        border: none;
+        border-radius: 14px;
+        padding: 14px 16px;
+        color: #f7f5f0;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .checkpoint-submit:disabled {
+        background: #888780;
+        cursor: not-allowed;
+      }
+
+      .checkpoint-status {
+        display: none;
+        margin-top: 14px;
+        border-radius: 12px;
+        padding: 12px 14px;
+        font-size: 13px;
+        line-height: 19px;
+        font-weight: 600;
+      }
+
+      .checkpoint-status.visible { display: block; }
+      .checkpoint-status.good { background: #e1f5ee; color: #0f6e56; }
+      .checkpoint-status.bad { background: #fdecea; color: #d85a30; }
+
+      .checkpoint-loading {
+        font-size: 14px;
+        color: #888780;
+        text-align: center;
+        padding: 24px 0 12px;
+        line-height: 20px;
+      }
+
       /* Submitted state */
       #submitted { display: none; text-align: center; padding: 16px 0; }
       .submitted-icon { font-size: 48px; margin-bottom: 12px; }
@@ -438,11 +687,20 @@
   </head>
   <body>
 
+    <div class="lang-bar">
+      <span class="lang-label" id="langLabel">Language</span>
+      <div class="lang-actions">
+        <button class="lang-btn" id="langBtnEn" onclick="setStudentLanguage('en')">EN</button>
+        <button class="lang-btn" id="langBtnHi" onclick="setStudentLanguage('hi')">HI</button>
+        <button class="lang-btn" id="langBtnMr" onclick="setStudentLanguage('mr')">MR</button>
+      </div>
+    </div>
+
     <!-- JOIN SCREEN -->
     <div class="card" id="joinScreen">
-      <p class="badge">STUDENT</p>
-      <h1>Join Session</h1>
-      <p class="subtitle">Enter the 4-digit code your teacher shared.</p>
+      <p class="badge" id="joinBadge">STUDENT</p>
+      <h1 id="joinTitle">Join Session</h1>
+      <p class="subtitle" id="joinSubtitle">Enter the 4-digit code your teacher shared.</p>
 
       <div class="error" id="joinError"></div>
 
@@ -457,7 +715,7 @@
 
       <button class="join-btn" id="joinBtn" onclick="joinSession()">Join →</button>
 
-      <p style="font-size:12px; color:#aeaca6; text-align:center; margin-top:8px;">
+      <p id="noAccountText" style="font-size:12px; color:#aeaca6; text-align:center; margin-top:8px;">
         No account or app needed.
       </p>
     </div>
@@ -466,7 +724,7 @@
     <div class="card" id="waiting">
       <div class="session-info" id="sessionInfo"></div>
       <div class="waiting-icon">⏳</div>
-      <p class="waiting-text">
+      <p class="waiting-text" id="waitingText">
         <span class="pulse"></span>
         Waiting for the teacher to start the round…
       </p>
@@ -475,31 +733,31 @@
     <!-- ACTIVE ROUND -->
     <div class="card" id="active">
       <div class="round-header">
-        <p class="badge">ROUND ACTIVE</p>
+        <p class="badge" id="roundActiveBadge">ROUND ACTIVE</p>
         <p class="round-title" id="sessionNameLabel"></p>
-        <p class="round-sub">Tap to signal — you can change anytime.</p>
+        <p class="round-sub" id="roundSub">Tap to signal — you can change anytime.</p>
       </div>
 
       <div class="signal-grid">
         <button class="signal-btn got"  id="btn_got_it"  onclick="selectSignal('got_it')">
           <span class="signal-emoji">✅</span>
           <span class="signal-label">
-            <span>Got it</span>
-            <span>I understand clearly</span>
+            <span id="sigGotTitle">Got it</span>
+            <span id="sigGotSub">I understand clearly</span>
           </span>
         </button>
         <button class="signal-btn sort" id="btn_sort_of" onclick="selectSignal('sort_of')">
           <span class="signal-emoji">🤔</span>
           <span class="signal-label">
-            <span>Sort of</span>
-            <span>Mostly following along</span>
+            <span id="sigSortTitle">Sort of</span>
+            <span id="sigSortSub">Mostly following along</span>
           </span>
         </button>
         <button class="signal-btn lost" id="btn_lost" onclick="selectSignal('lost')">
           <span class="signal-emoji">🆘</span>
           <span class="signal-label">
-            <span>Lost</span>
-            <span>Need more explanation</span>
+            <span id="sigLostTitle">Lost</span>
+            <span id="sigLostSub">Need more explanation</span>
           </span>
         </button>
       </div>
@@ -511,8 +769,8 @@
 
       <!-- Question box — shown when Lost is selected -->
       <div class="q-section" id="qSection">
-        <p class="q-label">What are you confused about?</p>
-        <p class="q-hint">Your question is sent anonymously to the teacher.</p>
+        <p class="q-label" id="qLabel">What are you confused about?</p>
+        <p class="q-hint" id="qHint">Your question is sent anonymously to the teacher.</p>
         <textarea id="questionInput" placeholder="Type your question here…"></textarea>
         <button class="ask-btn" id="askBtn" onclick="submitQuestion()">
           Send question →
@@ -522,23 +780,35 @@
       </div>
 
       <div class="quiz-section" id="quizSection">
-        <p class="quiz-title">QUIZ FROM FACULTY</p>
+        <p class="quiz-title" id="quizFromFacultyTitle">QUIZ FROM FACULTY</p>
         <div id="quizQuestions"></div>
+      </div>
+    </div>
+
+    <div class="checkpoint-overlay" id="checkpointOverlay">
+      <div class="checkpoint-card">
+        <p class="checkpoint-badge" id="checkpointBadge">SORT OF CHECK</p>
+        <p class="checkpoint-title" id="checkpointTitle">Quick quiz</p>
+        <p class="checkpoint-subtitle" id="checkpointSubtitle">Answer 5 quick questions based on the current lesson so we can classify your understanding.</p>
+        <div id="checkpointBody">
+          <p class="checkpoint-loading">Preparing a quiz for this session...</p>
+        </div>
+        <div class="checkpoint-status" id="checkpointStatus"></div>
       </div>
     </div>
 
     <!-- SUBMITTED / ROUND CLOSED -->
     <div class="card" id="submitted">
       <div class="submitted-icon">⏳</div>
-      <p class="submitted-text">Round closed.<br/>Waiting for the next round…</p>
+      <p class="submitted-text" id="submittedText">Round closed.<br/>Waiting for the next round…</p>
     </div>
 
     <!-- NUDGE MODAL -->
     <div id="nudgeOverlay">
       <div class="nudge-card">
         <div class="nudge-icon">👋</div>
-        <p class="nudge-title">Hey! Still with us?</p>
-        <p class="nudge-sub">Let your teacher know how you're following along.</p>
+        <p class="nudge-title" id="nudgeTitle">Hey! Still with us?</p>
+        <p class="nudge-sub" id="nudgeSub">Let your teacher know how you're following along.</p>
 
         <div class="nudge-bar-wrap">
           <div class="nudge-bar" id="nudgeBar"></div>
@@ -548,21 +818,21 @@
         <div class="nudge-grid">
           <button class="nudge-btn got"  onclick="selectFromNudge('got_it')">
             <span class="nudge-emoji">✅</span>
-            <span class="nudge-label"><span>Got it</span><span>I understand clearly</span></span>
+            <span class="nudge-label"><span id="nudgeGotTitle">Got it</span><span id="nudgeGotSub">I understand clearly</span></span>
           </button>
           <button class="nudge-btn sort" onclick="selectFromNudge('sort_of')">
             <span class="nudge-emoji">🤔</span>
-            <span class="nudge-label"><span>Sort of</span><span>Mostly following along</span></span>
+            <span class="nudge-label"><span id="nudgeSortTitle">Sort of</span><span id="nudgeSortSub">Mostly following along</span></span>
           </button>
           <button class="nudge-btn lost" onclick="selectFromNudge('lost')">
             <span class="nudge-emoji">🆘</span>
-            <span class="nudge-label"><span>Lost</span><span>Need more explanation</span></span>
+            <span class="nudge-label"><span id="nudgeLostTitle">Lost</span><span id="nudgeLostSub">Need more explanation</span></span>
           </button>
         </div>
       </div>
     </div>
 
-    <p class="footer">ClassPulse — anonymous classroom feedback</p>
+    <p class="footer" id="footerText">ClassPulse — anonymous classroom feedback</p>
 
 
 
@@ -571,7 +841,7 @@
       import {
         getFirestore, collection, query, where,
         getDocs, doc, getDoc, setDoc, addDoc,
-        onSnapshot, serverTimestamp,
+        onSnapshot, serverTimestamp, deleteField,
       } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
       const firebaseConfig = {
@@ -595,6 +865,323 @@
       let currentContextSummary = "";
       let toggleHistory = [];
 let buttonsLockedUntil = 0;
+      let currentContextPurpose = "";
+      let currentApiBaseUrl = "";
+      let checkpointQuiz = [];
+      let checkpointAnswers = {};
+      let checkpointBusy = false;
+      const CHECKPOINT_QUESTION_COUNT = 5;
+      let activeStudentQuizId = "";
+      let activeStudentQuiz = [];
+      let activeStudentQuizAnswers = {};
+      let activeStudentQuizSubmitting = false;
+      let preparedStudentQuizId = "";
+      let preparedStudentQuiz = [];
+      let preparingStudentQuiz = false;
+      let currentStudentLanguage = "en";
+      let currentSessionMeta = null;
+
+      const studentTranslations = {
+        en: {
+          pageTitle: "ClassPulse Student",
+          language: "Language",
+          joinBadge: "STUDENT",
+          joinTitle: "Join Session",
+          joinSubtitle: "Enter the 4-digit code your teacher shared.",
+          joinCta: "Join ->",
+          noAccount: "No account or app needed.",
+          waitingTeacher: "Waiting for the teacher to start the round...",
+          roundActiveBadge: "ROUND ACTIVE",
+          roundSub: "Tap to signal - you can change anytime.",
+          gotTitle: "Got it",
+          gotSub: "I understand clearly",
+          sortTitle: "Sort of",
+          sortSub: "Mostly following along",
+          lostTitle: "Lost",
+          lostSub: "Need more explanation",
+          qLabel: "What are you confused about?",
+          qHint: "Your question is sent anonymously to the teacher.",
+          questionPlaceholder: "Type your question here...",
+          sendQuestion: "Send question ->",
+          quizFromFaculty: "QUIZ FROM FACULTY",
+          checkpointBadge: "SORT OF CHECK",
+          checkpointTitle: "Quick quiz",
+          checkpointSubtitle: "Answer 5 quick questions based on the current lesson so we can classify your understanding.",
+          submittedText: "Round closed.<br/>Waiting for the next round...",
+          nudgeTitle: "Hey! Still with us?",
+          nudgeSub: "Let your teacher know how you're following along.",
+          footer: "ClassPulse - anonymous classroom feedback",
+          connecting: "Connecting...",
+          joining: "Joining...",
+          enterValidCode: "Please enter a valid 4-digit code.",
+          sessionNotFound: "Session not found. Check the code and try again.",
+          alreadyJoined: "You have already joined this session.",
+          connectionError: "Connection error. Try again.",
+          sessionLabel: "SESSION",
+          teacherLabel: "TEACHER",
+          checkpointLoading: "Preparing a quiz for this session...",
+          checkpointFailure: "Couldn't create a quick quiz right now.",
+          continueAsNotClear: "Continue as not clear",
+          answeredCount: "{count}/{total} answered",
+          submitQuiz: "Submit quiz",
+          fallbackQuizLoaded: "Live quiz generation was unavailable, so a fallback quiz was loaded.",
+          scoreMarking: "Score: {correct}/{total} ({percent}%). Marking this as {signal}.",
+          gotItSignal: "Got It",
+          lostSignal: "Lost",
+          saving: "Saving...",
+          saved: "Response saved",
+          errorNotConnected: "Error: Not connected to a session. Please rejoin.",
+          sending: "Sending...",
+          validationRejected: "Question not related to current class context, so it was not sent.",
+          failedToSend: "Failed to send: {msg}",
+          questionMerged: "Question merged! ({count} similar questions)",
+          questionSent: "Question sent to teacher!",
+          sentShort: "Sent!",
+          interactivePreparing: "Preparing interactive MCQ options...",
+          interactiveUnavailable: "Interactive options are temporarily unavailable for this quiz.",
+        },
+        hi: {
+          pageTitle: "ClassPulse छात्र",
+          language: "भाषा",
+          joinBadge: "छात्र",
+          joinTitle: "सत्र में जुड़ें",
+          joinSubtitle: "शिक्षक द्वारा साझा किया गया 4 अंकों का कोड दर्ज करें।",
+          joinCta: "जुड़ें ->",
+          noAccount: "कोई अकाउंट या ऐप आवश्यक नहीं है।",
+          waitingTeacher: "राउंड शुरू होने तक शिक्षक का इंतजार करें...",
+          roundActiveBadge: "राउंड सक्रिय",
+          roundSub: "संकेत चुनें - आप कभी भी बदल सकते हैं।",
+          gotTitle: "समझ आया",
+          gotSub: "मुझे स्पष्ट समझ है",
+          sortTitle: "कुछ हद तक",
+          sortSub: "ज़्यादातर समझ आ रहा है",
+          lostTitle: "समझ नहीं आया",
+          lostSub: "और समझाने की जरूरत है",
+          qLabel: "आप किस बात में भ्रमित हैं?",
+          qHint: "आपका प्रश्न शिक्षक को गुमनाम रूप से भेजा जाएगा।",
+          questionPlaceholder: "अपना प्रश्न यहां लिखें...",
+          sendQuestion: "प्रश्न भेजें ->",
+          quizFromFaculty: "शिक्षक की क्विज",
+          checkpointBadge: "कुछ हद तक जांच",
+          checkpointTitle: "त्वरित क्विज",
+          checkpointSubtitle: "पाठ के आधार पर 5 त्वरित प्रश्नों के उत्तर दें ताकि समझ का स्तर पता चल सके।",
+          submittedText: "राउंड बंद हो गया।<br/>अगले राउंड का इंतजार करें...",
+          nudgeTitle: "अरे! अभी भी साथ हैं?",
+          nudgeSub: "शिक्षक को बताएं कि आपकी समझ कैसी है।",
+          footer: "ClassPulse - गुमनाम कक्षा प्रतिक्रिया",
+          connecting: "कनेक्ट हो रहा है...",
+          joining: "जुड़ रहे हैं...",
+          enterValidCode: "कृपया मान्य 4 अंकों का कोड दर्ज करें।",
+          sessionNotFound: "सत्र नहीं मिला। कोड जांचकर फिर प्रयास करें।",
+          alreadyJoined: "आप पहले ही इस सत्र में जुड़ चुके हैं।",
+          connectionError: "कनेक्शन त्रुटि। फिर प्रयास करें।",
+          sessionLabel: "सत्र",
+          teacherLabel: "शिक्षक",
+          checkpointLoading: "इस सत्र के लिए क्विज तैयार हो रही है...",
+          checkpointFailure: "अभी त्वरित क्विज नहीं बनाई जा सकी।",
+          continueAsNotClear: "स्पष्ट नहीं के रूप में जारी रखें",
+          answeredCount: "{total} में से {count} उत्तर",
+          submitQuiz: "क्विज जमा करें",
+          fallbackQuizLoaded: "लाइव क्विज उपलब्ध नहीं थी, इसलिए वैकल्पिक क्विज लोड की गई।",
+          scoreMarking: "स्कोर: {correct}/{total} ({percent}%). इसे {signal} के रूप में चिह्नित किया गया।",
+          gotItSignal: "समझ आया",
+          lostSignal: "समझ नहीं आया",
+          saving: "सहेजा जा रहा है...",
+          saved: "उत्तर सहेज लिया गया",
+          errorNotConnected: "त्रुटि: सत्र से कनेक्ट नहीं हैं। कृपया फिर जुड़ें।",
+          sending: "भेजा जा रहा है...",
+          validationRejected: "प्रश्न वर्तमान कक्षा संदर्भ से संबंधित नहीं था, इसलिए नहीं भेजा गया।",
+          failedToSend: "भेजने में विफल: {msg}",
+          questionMerged: "प्रश्न मर्ज हुआ! ({count} समान प्रश्न)",
+          questionSent: "प्रश्न शिक्षक को भेज दिया गया!",
+          sentShort: "भेज दिया!",
+          interactivePreparing: "इंटरैक्टिव MCQ विकल्प तैयार किए जा रहे हैं...",
+          interactiveUnavailable: "इस क्विज के लिए इंटरैक्टिव विकल्प अभी उपलब्ध नहीं हैं।",
+        },
+        mr: {
+          pageTitle: "ClassPulse विद्यार्थी",
+          language: "भाषा",
+          joinBadge: "विद्यार्थी",
+          joinTitle: "सत्रात सामील व्हा",
+          joinSubtitle: "शिक्षकांनी दिलेला 4 अंकी कोड टाका.",
+          joinCta: "सामील व्हा ->",
+          noAccount: "खाते किंवा ॲपची गरज नाही.",
+          waitingTeacher: "राउंड सुरू होईपर्यंत शिक्षकांची वाट पाहा...",
+          roundActiveBadge: "राउंड सुरू आहे",
+          roundSub: "स्थिती निवडा - तुम्ही कधीही बदलू शकता.",
+          gotTitle: "समजले",
+          gotSub: "मला स्पष्ट समजले",
+          sortTitle: "थोडेसे",
+          sortSub: "बहुतेक समजत आहे",
+          lostTitle: "समजले नाही",
+          lostSub: "अजून स्पष्टीकरण हवे",
+          qLabel: "तुम्हाला नेमके काय समजले नाही?",
+          qHint: "तुमचा प्रश्न शिक्षकांना गुप्तपणे पाठवला जाईल.",
+          questionPlaceholder: "तुमचा प्रश्न येथे लिहा...",
+          sendQuestion: "प्रश्न पाठवा ->",
+          quizFromFaculty: "शिक्षकांकडून क्विज",
+          checkpointBadge: "समज तपासणी",
+          checkpointTitle: "जलद क्विज",
+          checkpointSubtitle: "चालू धड्यावर आधारित 5 जलद प्रश्नांची उत्तरे द्या.",
+          submittedText: "राउंड बंद झाला आहे.<br/>पुढील राउंडची वाट पाहा...",
+          nudgeTitle: "अहो! अजूनही सोबत आहात ना?",
+          nudgeSub: "तुमची समज शिक्षकांना कळवा.",
+          footer: "ClassPulse - गुप्त वर्ग प्रतिसाद",
+          connecting: "कनेक्ट होत आहे...",
+          joining: "सामील होत आहे...",
+          enterValidCode: "कृपया वैध 4 अंकी कोड टाका.",
+          sessionNotFound: "सत्र सापडले नाही. कोड तपासा आणि पुन्हा प्रयत्न करा.",
+          alreadyJoined: "तुम्ही आधीच या सत्रात सामील झाला आहात.",
+          connectionError: "कनेक्शन त्रुटी. पुन्हा प्रयत्न करा.",
+          sessionLabel: "सत्र",
+          teacherLabel: "शिक्षक",
+          checkpointLoading: "या सत्रासाठी क्विज तयार होत आहे...",
+          checkpointFailure: "सध्या जलद क्विज तयार करता आली नाही.",
+          continueAsNotClear: "समजले नाही म्हणून पुढे जा",
+          answeredCount: "{count}/{total} उत्तरे",
+          submitQuiz: "क्विज सबमिट करा",
+          fallbackQuizLoaded: "लाइव्ह क्विज उपलब्ध नव्हती, म्हणून पर्यायी क्विज लोड केली.",
+          scoreMarking: "गुण: {correct}/{total} ({percent}%). हे {signal} म्हणून नोंदवले.",
+          gotItSignal: "समजले",
+          lostSignal: "समजले नाही",
+          saving: "सेव्ह होत आहे...",
+          saved: "प्रतिसाद सेव्ह झाला",
+          errorNotConnected: "त्रुटी: सत्राशी जोडलेले नाही. कृपया पुन्हा सामील व्हा.",
+          sending: "पाठवत आहे...",
+          validationRejected: "प्रश्न सध्याच्या वर्ग संदर्भाशी संबंधित नव्हता, त्यामुळे पाठवला गेला नाही.",
+          failedToSend: "पाठवणे अयशस्वी: {msg}",
+          questionMerged: "प्रश्न एकत्र केला! ({count} समान प्रश्न)",
+          questionSent: "प्रश्न शिक्षकांना पाठवला!",
+          sentShort: "पाठवला!",
+          interactivePreparing: "इंटरॅक्टिव MCQ पर्याय तयार होत आहेत...",
+          interactiveUnavailable: "या क्विजसाठी इंटरॅक्टिव पर्याय सध्या उपलब्ध नाहीत.",
+        },
+      };
+
+      function t(key, vars = {}) {
+        const langPack = studentTranslations[currentStudentLanguage] || studentTranslations.en;
+        const fallback = studentTranslations.en;
+        let text = langPack[key] || fallback[key] || key;
+        Object.keys(vars).forEach((name) => {
+          text = text.replace(new RegExp(`\\{${name}\\}`, "g"), String(vars[name]));
+        });
+        return text;
+      }
+
+      function setText(id, value) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+      }
+
+      function setHtml(id, value) {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = value;
+      }
+
+      function renderSessionInfo() {
+        if (!currentSessionMeta) return;
+        const sessionInfo = document.getElementById("sessionInfo");
+        if (!sessionInfo) return;
+        sessionInfo.innerHTML = `
+          <p class="label">${t("sessionLabel")}</p>
+          <p class="value">${escapeHtml(currentSessionMeta.sessionName)}</p>
+          <p class="label" style="margin-top:10px">${t("teacherLabel")}</p>
+          <p class="value">${escapeHtml(currentSessionMeta.teacherName)}</p>
+        `;
+      }
+
+      function applyLanguageButtonState() {
+        ["en", "hi", "mr"].forEach((code) => {
+          const btn = document.getElementById(`langBtn${code.charAt(0).toUpperCase()}${code.slice(1)}`);
+          if (!btn) return;
+          btn.classList.toggle("active", currentStudentLanguage === code);
+        });
+      }
+
+      function applyStudentTranslations() {
+        document.documentElement.lang = currentStudentLanguage;
+        document.title = t("pageTitle");
+
+        setText("langLabel", t("language"));
+        setText("joinBadge", t("joinBadge"));
+        setText("joinTitle", t("joinTitle"));
+        setText("joinSubtitle", t("joinSubtitle"));
+        setText("noAccountText", t("noAccount"));
+        setText("roundActiveBadge", t("roundActiveBadge"));
+        setText("roundSub", t("roundSub"));
+        setText("sigGotTitle", t("gotTitle"));
+        setText("sigGotSub", t("gotSub"));
+        setText("sigSortTitle", t("sortTitle"));
+        setText("sigSortSub", t("sortSub"));
+        setText("sigLostTitle", t("lostTitle"));
+        setText("sigLostSub", t("lostSub"));
+        setText("qLabel", t("qLabel"));
+        setText("qHint", t("qHint"));
+        setText("quizFromFacultyTitle", t("quizFromFaculty"));
+        setText("checkpointBadge", t("checkpointBadge"));
+        setText("checkpointTitle", t("checkpointTitle"));
+        setText("checkpointSubtitle", t("checkpointSubtitle"));
+        setHtml("submittedText", t("submittedText"));
+        setText("nudgeTitle", t("nudgeTitle"));
+        setText("nudgeSub", t("nudgeSub"));
+        setText("nudgeGotTitle", t("gotTitle"));
+        setText("nudgeGotSub", t("gotSub"));
+        setText("nudgeSortTitle", t("sortTitle"));
+        setText("nudgeSortSub", t("sortSub"));
+        setText("nudgeLostTitle", t("lostTitle"));
+        setText("nudgeLostSub", t("lostSub"));
+        setText("footerText", t("footer"));
+
+        const waitingText = document.getElementById("waitingText");
+        if (waitingText) waitingText.innerHTML = `<span class="pulse"></span>${t("waitingTeacher")}`;
+
+        const codeInput = document.getElementById("codeInput");
+        if (codeInput) codeInput.placeholder = "1234";
+
+        const questionInput = document.getElementById("questionInput");
+        if (questionInput) questionInput.placeholder = t("questionPlaceholder");
+
+        const joinBtn = document.getElementById("joinBtn");
+        if (joinBtn && !joinBtn.disabled) joinBtn.textContent = t("joinCta");
+
+        const askBtn = document.getElementById("askBtn");
+        if (askBtn && !askBtn.disabled) askBtn.textContent = t("sendQuestion");
+
+        setText("qSent", `✓ ${t("questionSent")}`);
+
+        if (!checkpointQuiz.length && !checkpointBusy) {
+          const checkpointBody = document.getElementById("checkpointBody");
+          if (checkpointBody) {
+            checkpointBody.innerHTML = `<p class="checkpoint-loading">${t("checkpointLoading")}</p>`;
+          }
+        }
+
+        renderSessionInfo();
+        applyLanguageButtonState();
+      }
+
+      function getInitialStudentLanguage() {
+        const stored = localStorage.getItem("classpulseStudentLanguage");
+        if (stored === "en" || stored === "hi" || stored === "mr") return stored;
+        const nav = (navigator.language || "en").toLowerCase();
+        if (nav.startsWith("hi")) return "hi";
+        if (nav.startsWith("mr")) return "mr";
+        return "en";
+      }
+
+      window.setStudentLanguage = function (lang) {
+        if (!["en", "hi", "mr"].includes(lang)) return;
+        currentStudentLanguage = lang;
+        localStorage.setItem("classpulseStudentLanguage", lang);
+        applyStudentTranslations();
+
+        if (checkpointQuiz.length && document.getElementById("checkpointOverlay").classList.contains("visible")) {
+          renderCheckpointQuiz();
+        }
+        if (activeStudentQuiz.length) {
+          renderStudentQuiz({ questions: activeStudentQuiz, createdAt: activeStudentQuizId });
+        }
+      };
 
       // ── Nudge state ───────────────────────────────────────────
       const NUDGE_DELAY    = 15;
@@ -658,12 +1245,15 @@ function enableSignalButtons() {
 
 const studentId = getDeviceId();
 
+      currentStudentLanguage = getInitialStudentLanguage();
+      applyStudentTranslations();
+
       // ── Auto-connect from URL ─────────────────────────────────
       window.addEventListener("load", async () => {
         const params = new URLSearchParams(window.location.search);
         const s = params.get("session");
         if (s && s.trim()) {
-          document.getElementById("joinBtn").textContent = "Connecting…";
+          document.getElementById("joinBtn").textContent = t("connecting");
           document.getElementById("joinBtn").disabled    = true;
           document.getElementById("codeInput").disabled  = true;
           await connectToSession(s, true);
@@ -675,11 +1265,11 @@ const studentId = getDeviceId();
         const code    = document.getElementById("codeInput").value.trim();
         const joinBtn = document.getElementById("joinBtn");
         joinBtn.disabled    = true;
-        joinBtn.textContent = "Joining…";
+        joinBtn.textContent = t("joining");
         await connectToSession(code, false);
         if (document.getElementById("joinError").style.display !== "none") {
           joinBtn.disabled    = false;
-          joinBtn.textContent = "Join →";
+          joinBtn.textContent = t("joinCta");
         }
       };
 
@@ -701,7 +1291,7 @@ const studentId = getDeviceId();
             }
           } else {
             if (idOrCode.length !== 4 || isNaN(idOrCode)) {
-              errEl.textContent   = "Please enter a valid 4-digit code.";
+              errEl.textContent   = t("enterValidCode");
               errEl.style.display = "block";
               return;
             }
@@ -711,7 +1301,7 @@ const studentId = getDeviceId();
           }
 
           if (!sessionDoc) {
-            errEl.textContent   = "Session not found. Check the code and try again.";
+            errEl.textContent   = t("sessionNotFound");
             errEl.style.display = "block";
             return;
           }
@@ -722,7 +1312,7 @@ const studentId = getDeviceId();
 const existingStudent = await getDoc(studentRef);
 
 if (existingStudent.exists()) {
-  errEl.textContent = "You have already joined this session.";
+  errEl.textContent = t("alreadyJoined");
   errEl.style.display = "block";
   return;
 }
@@ -734,12 +1324,11 @@ await setDoc(studentRef, {
 });
           const data = sessionDoc.data();
 
-          document.getElementById("sessionInfo").innerHTML = `
-            <p class="label">SESSION</p>
-            <p class="value">${data.sessionName}</p>
-            <p class="label" style="margin-top:10px">TEACHER</p>
-            <p class="value">${data.teacherName}</p>
-          `;
+          currentSessionMeta = {
+            sessionName: data.sessionName || "",
+            teacherName: data.teacherName || "",
+          };
+          renderSessionInfo();
           document.getElementById("sessionNameLabel").textContent = data.sessionName;
           document.getElementById("joinScreen").style.display = "none";
           document.getElementById("waiting").style.display    = "block";
@@ -750,7 +1339,7 @@ await setDoc(studentRef, {
 
         } catch (e) {
           console.error(e);
-          errEl.textContent   = "Connection error. Try again.";
+          errEl.textContent   = t("connectionError");
           errEl.style.display = "block";
         }
       }
@@ -769,8 +1358,10 @@ await setDoc(studentRef, {
             ? data.contextTopics.filter((t) => typeof t === "string")
             : [];
           currentContextSummary = typeof data.contextSummary === "string" ? data.contextSummary : "";
+          currentContextPurpose = typeof data.contextPurpose === "string" ? data.contextPurpose : "";
+          currentApiBaseUrl = typeof data.apiBaseUrl === "string" ? data.apiBaseUrl.trim() : "";
 
-          renderStudentQuiz(data.activeQuiz);
+          void prepareStudentQuiz(data.activeQuiz);
 
           if (data.active) {
             hasBeenActive = true;
@@ -792,8 +1383,12 @@ await setDoc(studentRef, {
             nudgeArmedForRound = false;  // FIX: reset for next round
 
             selectedSig = null;
+            checkpointQuiz = [];
+            checkpointAnswers = {};
+            checkpointBusy = false;
             resetSignalButtons();
             hideQuestionSection();
+            hideCheckpointOverlay();
             showSaving('');
             document.getElementById("active").style.display = "none";
 
@@ -859,29 +1454,12 @@ await setDoc(studentRef, {
         stopNudgeTimer();
         hideNudge();
 
-        if (selectedSig === signal) return;
-        selectedSig = signal;
-        resetSignalButtons();
-        document.getElementById("btn_" + signal).classList.add("selected");
+        if (signal === 'sort_of') {
+          await openCheckpointQuiz({ forceRefresh: true });
+          return;
+        }
 
-        if (signal === 'lost') showQuestionSection();
-        else hideQuestionSection();
-
-        showSaving('saving');
-        clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(async () => {
-          try {
-            await setDoc(doc(db, "sessions", sessionId, "students", studentId), {
-              signal,
-              updatedAt: serverTimestamp(),
-            });
-            showSaving('saved');
-            setTimeout(() => showSaving(''), 2000);
-          } catch (e) {
-            console.error("Save signal failed:", e);
-            showSaving('');
-          }
-        }, 400);
+        await setStudentSignal(signal);
       };
 
       function resetSignalButtons() {
@@ -890,6 +1468,315 @@ await setDoc(studentRef, {
         );
       }
 
+      function getApiBaseUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const apiFromQuery = (params.get("api") || params.get("apiBase") || "").trim();
+        if (apiFromQuery) {
+          localStorage.setItem("classpulseApiBase", apiFromQuery);
+          return apiFromQuery.replace(/\/$/, "");
+        }
+
+        if (currentApiBaseUrl) {
+          return currentApiBaseUrl.replace(/\/$/, "");
+        }
+
+        const stored = (localStorage.getItem("classpulseApiBase") || "").trim();
+        if (stored) {
+          return stored.replace(/\/$/, "");
+        }
+
+        if (window.location.protocol === "file:") {
+          return "http://192.168.0.144:3000";
+        }
+
+        if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+          return `${window.location.protocol}//${window.location.hostname}:3000`;
+        }
+
+        return "";
+      }
+
+      function normalizeGeneratedMcq(value) {
+        if (!value || typeof value !== "object") return null;
+        const question = typeof value.question === "string" ? value.question.trim() : "";
+        const options = Array.isArray(value.options)
+          ? value.options.filter((item) => typeof item === "string").slice(0, 4)
+          : [];
+        const correctAnswer = typeof value.correctAnswer === "string" ? value.correctAnswer.trim() : "";
+        if (!question || options.length !== 4 || !options.includes(correctAnswer)) return null;
+        return { question, options, correctAnswer };
+      }
+
+      function buildFallbackCheckpointQuiz() {
+        const topicHint = currentContextTopics.length ? currentContextTopics[0] : "this lesson";
+        const topicLine = currentContextTopics.length ? currentContextTopics.join(", ") : "current topic";
+        const summaryLine = (currentContextSummary || currentContextRaw || "the current lesson").slice(0, 120);
+
+        return [
+          {
+            question: `Which statement best matches what was explained about ${topicHint}?`,
+            options: [
+              `It focuses on ${topicHint} and its core idea`,
+              `It was unrelated to ${topicHint}`,
+              `It only discussed homework rules`,
+              `It was only about attendance`,
+            ],
+            correctAnswer: `It focuses on ${topicHint} and its core idea`,
+          },
+          {
+            question: `Based on today's context, what is the most relevant topic list?`,
+            options: [
+              topicLine,
+              "Sports and weather",
+              "Music and movies",
+              "Travel plans",
+            ],
+            correctAnswer: topicLine,
+          },
+          {
+            question: `Which option best summarizes the lesson intent?`,
+            options: [
+              summaryLine,
+              "No learning objective was discussed",
+              "Only grading policy was discussed",
+              "No subject matter was covered",
+            ],
+            correctAnswer: summaryLine,
+          },
+          {
+            question: `If a classmate is confused, what should they do in this activity?`,
+            options: [
+              "Use Lost and ask a question",
+              "Close the page immediately",
+              "Select random answers",
+              "Wait silently",
+            ],
+            correctAnswer: "Use Lost and ask a question",
+          },
+          {
+            question: `What does scoring at least 50% on this check indicate?`,
+            options: [
+              "Understanding is closer to Got It",
+              "Understanding should always be Lost",
+              "The score is ignored",
+              "The teacher cannot use the result",
+            ],
+            correctAnswer: "Understanding is closer to Got It",
+          },
+        ];
+      }
+
+      async function setStudentSignal(signal, extras = {}) {
+        const hasQuizScore = Object.prototype.hasOwnProperty.call(extras, "quizScore");
+        if (selectedSig === signal && !hasQuizScore) return;
+
+        selectedSig = signal;
+        resetSignalButtons();
+
+        const activeButton = document.getElementById("btn_" + signal);
+        if (activeButton) activeButton.classList.add("selected");
+
+        if (signal === 'lost') showQuestionSection();
+        else hideQuestionSection();
+
+        checkpointQuiz = [];
+        checkpointAnswers = {};
+        hideCheckpointOverlay();
+
+        showSaving('saving');
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(async () => {
+          try {
+            await setDoc(doc(db, "sessions", sessionId, "students", studentId), {
+              signal,
+              quizScore: hasQuizScore ? extras.quizScore : deleteField(),
+              updatedAt: serverTimestamp(),
+            }, { merge: true });
+            showSaving('saved');
+            setTimeout(() => showSaving(''), 2000);
+          } catch (e) {
+            console.error("Save signal failed:", e);
+            showSaving('');
+          }
+        }, 400);
+      }
+
+      async function openCheckpointQuiz({ forceRefresh = false } = {}) {
+        if (checkpointBusy) return;
+
+        if (!forceRefresh && checkpointQuiz.length) {
+          showCheckpointOverlay();
+          renderCheckpointQuiz();
+          return;
+        }
+
+        checkpointBusy = true;
+        selectedSig = "sort_of";
+        checkpointAnswers = {};
+        resetSignalButtons();
+        document.getElementById("btn_sort_of").classList.add("selected");
+        hideQuestionSection();
+        renderCheckpointLoading();
+        showCheckpointOverlay();
+
+        try {
+          const response = await fetch(`${getApiBaseUrl()}/generate-quiz`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              responseFormat: "mcq",
+              contextSummary: currentContextSummary || currentContextRaw,
+              contextTopics: currentContextTopics,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`quiz generation failed: ${response.status}`);
+          }
+
+          const payload = await response.json();
+          const questions = Array.isArray(payload?.questions) ? payload.questions : [];
+          const validQuestions = questions.map((item) => normalizeGeneratedMcq(item)).filter(Boolean);
+
+          if (validQuestions.length !== CHECKPOINT_QUESTION_COUNT) {
+            throw new Error("invalid quiz payload");
+          }
+
+          checkpointQuiz = validQuestions;
+          renderCheckpointQuiz();
+        } catch (error) {
+          console.error("Checkpoint quiz failed:", error);
+          checkpointQuiz = buildFallbackCheckpointQuiz();
+          checkpointAnswers = {};
+          renderCheckpointQuiz();
+          const status = document.getElementById("checkpointStatus");
+          status.className = "checkpoint-status visible bad";
+          status.textContent = t("fallbackQuizLoaded");
+        } finally {
+          checkpointBusy = false;
+        }
+      }
+
+      function showCheckpointOverlay() {
+        document.getElementById("checkpointOverlay").classList.add("visible");
+      }
+
+      function hideCheckpointOverlay() {
+        document.getElementById("checkpointOverlay").classList.remove("visible");
+        clearCheckpointStatus();
+      }
+
+      function clearCheckpointStatus() {
+        const status = document.getElementById("checkpointStatus");
+        status.className = "checkpoint-status";
+        status.textContent = "";
+      }
+
+      function renderCheckpointLoading() {
+        clearCheckpointStatus();
+        document.getElementById("checkpointBody").innerHTML = `
+          <p class="checkpoint-loading">${t("checkpointLoading")}</p>
+        `;
+      }
+
+      function renderCheckpointFailure() {
+        clearCheckpointStatus();
+        document.getElementById("checkpointBody").innerHTML = `
+          <p class="checkpoint-loading">${t("checkpointFailure")}</p>
+          <button class="ask-btn" onclick="fallbackToNotClear()">${t("continueAsNotClear")}</button>
+        `;
+      }
+
+      function renderCheckpointQuiz() {
+        if (!checkpointQuiz.length) return;
+
+        const answeredCount = Object.keys(checkpointAnswers).length;
+
+        clearCheckpointStatus();
+        document.getElementById("checkpointBody").innerHTML = `
+          <p class="checkpoint-progress">${t("answeredCount", { count: answeredCount, total: CHECKPOINT_QUESTION_COUNT })}</p>
+          ${checkpointQuiz.map((item, questionIndex) => `
+            <div class="checkpoint-question-block">
+              <p class="checkpoint-question">Q${questionIndex + 1}. ${escapeHtml(item.question)}</p>
+              <div class="checkpoint-options">
+                ${item.options.map((option, optionIndex) => `
+                  <label class="checkpoint-option ${checkpointAnswers[questionIndex] === optionIndex ? "selected" : ""}">
+                    <input
+                      type="radio"
+                      name="checkpoint_q_${questionIndex}"
+                      value="${optionIndex}"
+                      ${checkpointAnswers[questionIndex] === optionIndex ? "checked" : ""}
+                      onchange="setCheckpointAnswer(${questionIndex}, ${optionIndex})"
+                    />
+                    <span>${escapeHtml(option)}</span>
+                  </label>
+                `).join("")}
+              </div>
+            </div>
+          `).join("")}
+          <div class="checkpoint-actions">
+            <button
+              class="checkpoint-submit"
+              onclick="submitCheckpointQuiz()"
+              ${answeredCount === checkpointQuiz.length ? "" : "disabled"}
+            >${t("submitQuiz")}</button>
+          </div>
+        `;
+      }
+
+      function escapeHtml(text) {
+        return String(text)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      window.setCheckpointAnswer = function (questionIndex, optionIndex) {
+        checkpointAnswers[questionIndex] = optionIndex;
+        renderCheckpointQuiz();
+      };
+
+      window.submitCheckpointQuiz = async function () {
+        if (!checkpointQuiz.length) return;
+
+        if (Object.keys(checkpointAnswers).length !== checkpointQuiz.length) {
+          return;
+        }
+
+        const correctAnswers = checkpointQuiz.reduce((count, item, questionIndex) => {
+          const selectedIndex = checkpointAnswers[questionIndex];
+          const selectedOption = typeof selectedIndex === "number" ? item.options[selectedIndex] : null;
+          return count + (selectedOption === item.correctAnswer ? 1 : 0);
+        }, 0);
+
+        const score = correctAnswers / checkpointQuiz.length;
+        const finalSignal = score >= 0.5 ? "got_it" : "lost";
+        const status = document.getElementById("checkpointStatus");
+        status.className = `checkpoint-status visible ${finalSignal === "got_it" ? "good" : "bad"}`;
+        status.textContent = t("scoreMarking", {
+          correct: correctAnswers,
+          total: checkpointQuiz.length,
+          percent: Math.round(score * 100),
+          signal: finalSignal === "got_it" ? t("gotItSignal") : t("lostSignal"),
+        });
+
+        document.querySelectorAll(".checkpoint-option").forEach((optionEl) => {
+          optionEl.classList.add("locked");
+          const input = optionEl.querySelector("input");
+          if (input) input.disabled = true;
+        });
+
+        setTimeout(async () => {
+          await setStudentSignal(finalSignal, { quizScore: score });
+        }, 900);
+      };
+
+      window.fallbackToNotClear = async function () {
+        await setStudentSignal("lost");
+      };
+
       function showQuestionSection() {
         document.getElementById("qSection").classList.add("visible");
         document.getElementById("questionInput").value = "";
@@ -897,37 +1784,214 @@ await setDoc(studentRef, {
         document.getElementById("qSent").style.display  = "none";
         document.getElementById("qError").style.display = "none";
         document.getElementById("askBtn").disabled      = false;
-        document.getElementById("askBtn").textContent   = "Send question →";
+        document.getElementById("askBtn").textContent   = t("sendQuestion");
       }
 
       function hideQuestionSection() {
         document.getElementById("qSection").classList.remove("visible");
       }
 
+            function normalizeFacultyQuizQuestion(value) {
+              if (!value || typeof value !== "object") return null;
+              const question = typeof value.question === "string"
+                ? value.question.trim()
+                : (typeof value.text === "string" ? value.text.trim() : "");
+              const options = Array.isArray(value.options)
+                ? value.options.filter((item) => typeof item === "string").slice(0, 4)
+                : [];
+              const correctAnswer = typeof value.correctAnswer === "string" ? value.correctAnswer.trim() : "";
+              return { question, options, correctAnswer };
+            }
+
+            function getActiveQuizId(activeQuiz) {
+              return String(activeQuiz?.createdAt || activeQuiz?.quizId || activeQuiz?.publishedAt || "quiz-default");
+            }
+
+            async function prepareStudentQuiz(activeQuiz) {
+              const quizSection = document.getElementById("quizSection");
+              const quizQuestions = document.getElementById("quizQuestions");
+              const rawQuestions = Array.isArray(activeQuiz?.questions) ? activeQuiz.questions : [];
+
+              if (!rawQuestions.length) {
+                preparedStudentQuizId = "";
+                preparedStudentQuiz = [];
+                renderStudentQuiz({ questions: [] });
+                return;
+              }
+
+              const quizId = getActiveQuizId(activeQuiz);
+              if (preparedStudentQuizId === quizId && preparedStudentQuiz.length) {
+                renderStudentQuiz({ questions: preparedStudentQuiz, createdAt: quizId });
+                return;
+              }
+
+              const normalized = rawQuestions
+                .map((item) => normalizeFacultyQuizQuestion(item))
+                .filter((item) => item && item.question);
+
+              const hasMcq = normalized.length > 0 && normalized.every(
+                (item) => Array.isArray(item.options) && item.options.length === 4 && typeof item.correctAnswer === "string" && item.options.includes(item.correctAnswer)
+              );
+
+              if (hasMcq) {
+                preparedStudentQuizId = quizId;
+                preparedStudentQuiz = normalized;
+                renderStudentQuiz({ questions: preparedStudentQuiz, createdAt: quizId });
+                return;
+              }
+
+              if (preparingStudentQuiz) return;
+              preparingStudentQuiz = true;
+              quizSection.classList.add("visible");
+              quizQuestions.innerHTML = `<p class="checkpoint-loading">${t("interactivePreparing")}</p>`;
+
+              try {
+                const textOnlyQuestions = normalized.map((item) => item.question).filter(Boolean);
+                const contextForMcq = [currentContextSummary, ...textOnlyQuestions].filter(Boolean).join("\n");
+                const apiBase = getApiBaseUrl();
+
+                if (!apiBase) {
+                  throw new Error("API base URL not configured");
+                }
+
+                const response = await fetch(`${apiBase}/generate-quiz`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    responseFormat: "mcq",
+                    contextSummary: contextForMcq,
+                    contextTopics: currentContextTopics,
+                  }),
+                });
+
+                if (!response.ok) {
+                  throw new Error(`generate-quiz failed: ${response.status}`);
+                }
+
+                const payload = await response.json();
+                const generated = Array.isArray(payload?.questions)
+                  ? payload.questions.map((item) => normalizeGeneratedMcq(item)).filter(Boolean)
+                  : [];
+
+                if (!generated.length) {
+                  throw new Error("No MCQs returned");
+                }
+
+                preparedStudentQuizId = quizId;
+                preparedStudentQuiz = generated;
+                renderStudentQuiz({ questions: preparedStudentQuiz, createdAt: quizId });
+              } catch (error) {
+                console.error("Failed to prepare interactive student quiz:", error);
+                preparedStudentQuizId = quizId;
+                preparedStudentQuiz = normalized;
+                renderStudentQuiz({ questions: preparedStudentQuiz, createdAt: quizId });
+                const statusEl = document.getElementById("studentQuizStatus");
+                if (statusEl) {
+                  statusEl.className = "student-quiz-status visible bad";
+                  statusEl.textContent = t("interactiveUnavailable");
+                }
+              } finally {
+                preparingStudentQuiz = false;
+              }
+            }
+
             function renderStudentQuiz(activeQuiz) {
               const quizSection = document.getElementById("quizSection");
               const quizQuestions = document.getElementById("quizQuestions");
 
               const questions = Array.isArray(activeQuiz?.questions)
-                ? activeQuiz.questions
+                ? activeQuiz.questions.map((item) => normalizeFacultyQuizQuestion(item)).filter(Boolean)
                 : [];
 
               if (!questions.length) {
+                activeStudentQuizId = "";
+                activeStudentQuiz = [];
+                activeStudentQuizAnswers = {};
                 quizSection.classList.remove("visible");
                 quizQuestions.innerHTML = "";
                 return;
               }
 
-              quizQuestions.innerHTML = questions
-                .map((q, idx) => {
-                  const text = typeof q === "string" ? q : q?.text;
-                  if (!text) return "";
-                  return `<div class="quiz-item"><strong>Q${idx + 1}:</strong> ${text}</div>`;
-                })
-                .join("");
+              const quizId = getActiveQuizId(activeQuiz);
+              if (activeStudentQuizId !== quizId) {
+                activeStudentQuizId = quizId;
+                activeStudentQuizAnswers = {};
+                activeStudentQuizSubmitting = false;
+              }
+              activeStudentQuiz = questions;
+
+              const hasMcq = questions.every((item) => Array.isArray(item.options) && item.options.length === 4);
+              if (!hasMcq) {
+                quizQuestions.innerHTML = questions
+                  .map((q, idx) => `<div class="quiz-item"><strong>Q${idx + 1}:</strong> ${escapeHtml(q.question)}</div>`)
+                  .join("");
+                quizSection.classList.add("visible");
+                return;
+              }
+
+              const answeredCount = Object.keys(activeStudentQuizAnswers).length;
+              quizQuestions.innerHTML = `
+                <p class="checkpoint-progress">${t("answeredCount", { count: answeredCount, total: questions.length })}</p>
+                ${questions.map((item, questionIndex) => `
+                  <div class="student-quiz-question">
+                    <p>Q${questionIndex + 1}. ${escapeHtml(item.question)}</p>
+                    ${item.options.map((option, optionIndex) => `
+                      <label class="student-quiz-option">
+                        <input
+                          type="radio"
+                          name="student_quiz_q_${questionIndex}"
+                          value="${optionIndex}"
+                          ${activeStudentQuizAnswers[questionIndex] === optionIndex ? "checked" : ""}
+                          onchange="setStudentQuizAnswer(${questionIndex}, ${optionIndex})"
+                        />
+                        <span>${escapeHtml(option)}</span>
+                      </label>
+                    `).join("")}
+                  </div>
+                `).join("")}
+                <div class="student-quiz-actions">
+                  <button class="ask-btn" onclick="submitStudentQuiz()" ${answeredCount === questions.length && !activeStudentQuizSubmitting ? "" : "disabled"}>${t("submitQuiz")}</button>
+                </div>
+                <div class="student-quiz-status" id="studentQuizStatus"></div>
+              `;
 
               quizSection.classList.add("visible");
             }
+
+      window.setStudentQuizAnswer = function (questionIndex, optionIndex) {
+        activeStudentQuizAnswers[questionIndex] = optionIndex;
+        renderStudentQuiz({ questions: activeStudentQuiz, createdAt: activeStudentQuizId });
+      };
+
+      window.submitStudentQuiz = async function () {
+        if (!activeStudentQuiz.length) return;
+        if (Object.keys(activeStudentQuizAnswers).length !== activeStudentQuiz.length) return;
+        if (activeStudentQuizSubmitting) return;
+
+        activeStudentQuizSubmitting = true;
+
+        const correctAnswers = activeStudentQuiz.reduce((count, item, questionIndex) => {
+          const selectedIndex = activeStudentQuizAnswers[questionIndex];
+          const selectedOption = typeof selectedIndex === "number" ? item.options[selectedIndex] : null;
+          return count + (selectedOption === item.correctAnswer ? 1 : 0);
+        }, 0);
+
+        const score = correctAnswers / activeStudentQuiz.length;
+        const finalSignal = score >= 0.5 ? "got_it" : "lost";
+        const status = document.getElementById("studentQuizStatus");
+        if (status) {
+          status.className = `student-quiz-status visible ${finalSignal === "got_it" ? "good" : "bad"}`;
+          status.textContent = t("scoreMarking", {
+            correct: correctAnswers,
+            total: activeStudentQuiz.length,
+            percent: Math.round(score * 100),
+            signal: finalSignal === "got_it" ? t("gotItSignal") : t("lostSignal"),
+          });
+        }
+
+        await setStudentSignal(finalSignal, { quizScore: score });
+        activeStudentQuizSubmitting = false;
+      };
 
       function showSaving(state) {
         const row  = document.getElementById("savingRow");
@@ -935,10 +1999,10 @@ await setDoc(studentRef, {
         row.className = "saving-row";
         if (state === 'saving') {
           row.classList.add("show");
-          text.textContent = "Saving…";
+          text.textContent = t("saving");
         } else if (state === 'saved') {
           row.classList.add("saved");
-          text.textContent = "✓ Response saved";
+          text.textContent = `✓ ${t("saved")}`;
         } else {
           text.textContent = "";
         }
@@ -960,36 +2024,117 @@ await setDoc(studentRef, {
         }
 
         if (!sessionId) {
-          qError.textContent   = "Error: Not connected to a session. Please rejoin.";
+          qError.textContent   = t("errorNotConnected");
           qError.style.display = "block";
           return;
         }
 
         input.classList.remove("error-border");
         askBtn.disabled    = true;
-        askBtn.textContent = "Sending…";
+        askBtn.textContent = t("sending");
 
         try {
+          const apiBase = getApiBaseUrl();
 
-    // Directly save question to Firestore
-    await addDoc(collection(db, "sessions", sessionId, "questions"), {
-      text: text,
-      upvotes: 0,
-      askedAt: serverTimestamp(),
-      studentId: studentId
-    });
+          // If API is reachable, keep strict relevance validation.
+          // If API is unavailable, still save the student question directly.
+          if (apiBase) {
+            try {
+              const validateRes = await fetch(`${apiBase}/validate-question`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  question: text,
+                  contextRaw: currentContextRaw,
+                  contextTopics: currentContextTopics,
+                  contextSummary: currentContextSummary || currentContextRaw,
+                }),
+              });
 
-    document.getElementById("qSent").style.display = "block";
-    askBtn.textContent = "✓ Sent";
-    input.value = "";
+              if (validateRes.ok) {
+                const validation = await validateRes.json();
+                if (validation?.isRelevant !== true) {
+                  qError.textContent = t("validationRejected");
+                  qError.style.display = "block";
+                  askBtn.disabled = false;
+                  askBtn.textContent = t("sendQuestion");
+                  return;
+                }
+              } else {
+                console.warn("[submitQuestion] Validation unavailable, continuing with direct submission");
+              }
+            } catch (validateError) {
+              console.warn("[submitQuestion] Validation request failed, continuing with direct submission:", validateError);
+            }
+          } else {
+            console.warn("[submitQuestion] API base URL unavailable, continuing with direct submission");
+          }
 
-  } catch (e) {
-    console.error("Question save failed:", e);
-    alert("Could not send question. Try again.");
-    askBtn.disabled    = false;
-    askBtn.textContent = "Submit question →";
-  }
-};
+          // Prefer server-side dedup endpoint; fallback to direct Firestore write
+          // so submission flow still works when server Firestore creds are not configured.
+          let dedupResult = null;
+
+          try {
+            if (!apiBase) {
+              throw new Error("Missing API base URL for dedup endpoint");
+            }
+
+            const dedupRes = await fetch(`${apiBase}/submit-question-with-dedup`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                sessionId: sessionId,
+                questionText: text,
+                studentId: studentId,
+                similarityThreshold: 0.75,
+              }),
+            });
+            if (!dedupRes.ok) {
+              throw new Error(`Dedup endpoint error: ${dedupRes.status}`);
+            }
+            dedupResult = await dedupRes.json();
+            if (!dedupResult?.success) {
+              throw new Error(dedupResult?.message || "Dedup endpoint returned unsuccessful response");
+            }
+          } catch (dedupError) {
+            console.warn("[submitQuestion] Dedup unavailable, falling back to direct Firestore add:", dedupError);
+            await addDoc(collection(db, "sessions", sessionId, "questions"), {
+              text,
+              count: 1,
+              upvotes: 0,
+              askedAt: serverTimestamp(),
+              lastAskedAt: serverTimestamp(),
+              studentId,
+              studentIds: [studentId],
+            });
+            dedupResult = {
+              isDuplicate: false,
+              count: 1,
+            };
+          }
+
+          // Show success message (indicate if it was merged or new)
+          const successMsg = dedupResult.isDuplicate
+            ? `✓ ${t("questionMerged", { count: dedupResult.count })}`
+            : `✓ ${t("questionSent")}`;
+
+          document.getElementById("qSent").style.display = "block";
+          document.getElementById("qSent").textContent = successMsg;
+          askBtn.textContent = `✓ ${t("sentShort")}`;
+          input.value = "";
+
+          setTimeout(() => {
+            askBtn.disabled = false;
+            askBtn.textContent = t("sendQuestion");
+          }, 3000);
+        } catch (e) {
+          const msg = e?.message || e?.code || JSON.stringify(e) || "Unknown error";
+          qError.textContent = t("failedToSend", { msg });
+          qError.style.display = "block";
+          askBtn.disabled = false;
+          askBtn.textContent = t("sendQuestion");
+        }
+      };
 
       // Enter key to join
       document.getElementById("codeInput").addEventListener("keydown", e => {
@@ -998,3 +2143,4 @@ await setDoc(studentRef, {
     </script>
   </body>
 </html>
+

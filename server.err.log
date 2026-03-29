@@ -1,0 +1,6 @@
+[openrouter] model mistralai/mistral-7b-instruct failed: 404 {"error":{"message":"No endpoints found for mistralai/mistral-7b-instruct.","code":404},"user_id":"user_3BaZqRzm7MHdhDymG5j9DggRS8X"}
+[openrouter] model mistralai/mistral-7b-instruct:free failed: 404 {"error":{"message":"No endpoints found for mistralai/mistral-7b-instruct:free.","code":404},"user_id":"user_3BaZqRzm7MHdhDymG5j9DggRS8X"}
+[openrouter] model mistralai/mistral-7b-instruct failed: 404 {"error":{"message":"No endpoints found for mistralai/mistral-7b-instruct.","code":404},"user_id":"user_3BaZqRzm7MHdhDymG5j9DggRS8X"}
+[openrouter] model mistralai/mistral-7b-instruct:free failed: 404 {"error":{"message":"No endpoints found for mistralai/mistral-7b-instruct:free.","code":404},"user_id":"user_3BaZqRzm7MHdhDymG5j9DggRS8X"}
+[openrouter] model mistralai/mistral-7b-instruct failed: 404 {"error":{"message":"No endpoints found for mistralai/mistral-7b-instruct.","code":404},"user_id":"user_3BaZqRzm7MHdhDymG5j9DggRS8X"}
+[openrouter] model mistralai/mistral-7b-instruct:free failed: 404 {"error":{"message":"No endpoints found for mistralai/mistral-7b-instruct:free.","code":404},"user_id":"user_3BaZqRzm7MHdhDymG5j9DggRS8X"}

@@ -2,13 +2,34 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 
+// Initialize Firestore
+const { initializeApp, cert } = require('firebase-admin/app');
+const { getFirestore, collection, getDocs, doc, updateDoc, addDoc, serverTimestamp } = require('firebase-admin/firestore');
+
 dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const PRIMARY_MODEL = 'mistralai/mistral-7b-instruct';
-const MODEL_CANDIDATES = [PRIMARY_MODEL, 'mistralai/mistral-7b-instruct:free', 'openrouter/auto'];
+const PRIMARY_MODEL = 'openrouter/auto';
+const MODEL_CANDIDATES = [PRIMARY_MODEL, 'mistralai/mistral-7b-instruct-v0.1'];
+
+// Initialize Firebase Admin SDK if service account is provided
+let db = null;
+try {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+    initializeApp({
+      credential: cert(serviceAccount),
+    });
+    db = getFirestore();
+    console.log('[backend] Firestore initialized successfully');
+  } else {
+    console.warn('[backend] FIREBASE_SERVICE_ACCOUNT_JSON not set - Firestore operations will not work');
+  }
+} catch (error) {
+  console.error('[backend] Failed to initialize Firestore:', error);
+}
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
@@ -17,7 +38,7 @@ app.get('/', (_req, res) => {
   res.json({
     ok: true,
     service: 'ClassPulse backend',
-    endpoints: ['/health', '/extract-context', '/generate-quiz', '/validate-question'],
+    endpoints: ['/health', '/extract-context', '/generate-quiz', '/validate-question', '/generate-checkpoint-question', '/submit-question-with-dedup'],
   });
 });
 
@@ -68,11 +89,82 @@ function parseQuizPayload(raw) {
   };
 }
 
+function normalizeMcqQuestion(value) {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const question = typeof value.question === 'string' ? value.question.trim() : '';
+  const options = Array.isArray(value.options)
+    ? value.options
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter(Boolean)
+        .slice(0, 4)
+    : [];
+  const correctAnswer = typeof value.correctAnswer === 'string' ? value.correctAnswer.trim() : '';
+  const matchedCorrectAnswer = options.find((option) => option === correctAnswer);
+
+  if (!question || options.length !== 4 || !matchedCorrectAnswer) {
+    return null;
+  }
+
+  return {
+    question,
+    options,
+    correctAnswer: matchedCorrectAnswer,
+  };
+}
+
+function parseMcqQuizPayload(raw) {
+  const parsed = JSON.parse(raw);
+  const source = Array.isArray(parsed) ? parsed : parsed.questions;
+
+  if (!Array.isArray(source)) {
+    return { questions: [] };
+  }
+
+  return {
+    questions: source.map((item) => normalizeMcqQuestion(item)).filter(Boolean).slice(0, 5),
+  };
+}
+
 function parseValidationPayload(raw) {
   const parsed = JSON.parse(raw);
   return {
     isRelevant: typeof parsed?.isRelevant === 'boolean' ? parsed.isRelevant : null,
   };
+}
+
+function normalizeCheckpointQuestion(value) {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const question = typeof value.question === 'string' ? value.question.trim() : '';
+  const options = Array.isArray(value.options)
+    ? value.options
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter(Boolean)
+        .slice(0, 4)
+    : [];
+  const correctOptionIndex = Number.isInteger(value.correctOptionIndex)
+    ? value.correctOptionIndex
+    : Number.parseInt(value.correctOptionIndex, 10);
+
+  if (!question || options.length !== 4 || correctOptionIndex < 0 || correctOptionIndex > 3) {
+    return null;
+  }
+
+  return {
+    question,
+    options,
+    correctOptionIndex,
+  };
+}
+
+function parseCheckpointPayload(raw) {
+  const parsed = JSON.parse(raw);
+  return normalizeCheckpointQuestion(parsed);
 }
 
 function fallbackExtractContext() {
@@ -82,9 +174,16 @@ function fallbackExtractContext() {
   };
 }
 
-function extractJsonFromText(text) {
+function extractJsonFromText(text, preferredShape = 'object') {
   if (typeof text !== 'string') {
     throw new Error('AI response content is not a string');
+  }
+
+  if (preferredShape === 'array') {
+    const jsonArrayMatch = text.match(/\[[\s\S]*\]/);
+    if (jsonArrayMatch) {
+      return jsonArrayMatch[0];
+    }
   }
 
   const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -93,6 +192,114 @@ function extractJsonFromText(text) {
   }
 
   return jsonMatch[0];
+}
+
+// ────────────────────────────────────────────────────────
+// QUESTION SIMILARITY & DEDUPLICATION UTILITIES
+// ────────────────────────────────────────────────────────
+
+/**
+ * Normalize question text by removing punctuation, lowercasing, etc.
+ */
+function normalizeQuestionText(text) {
+  if (typeof text !== 'string') return '';
+  return text
+    .toLowerCase()
+    .replace(/[.,!?;:()[\]{}""''`]/g, '')  // Remove punctuation
+    .replace(/\s+/g, ' ')                  // Normalize spaces
+    .trim();
+}
+
+/**
+ * Calculate Levenshtein distance (edit distance) between two strings
+ */
+function levenshteinDistance(str1, str2) {
+  const matrix = [];
+
+  for (let i = 0; i <= str2.length; i++) {
+    matrix[i] = [i];
+  }
+
+  for (let j = 0; j <= str1.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= str2.length; i++) {
+    for (let j = 1; j <= str1.length; j++) {
+      const cost = str1[j - 1] === str2[i - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i][j - 1] + 1,      // Insertion
+        matrix[i - 1][j] + 1,      // Deletion
+        matrix[i - 1][j - 1] + cost // Substitution
+      );
+    }
+  }
+
+  return matrix[str2.length][str1.length];
+}
+
+/**
+ * Calculate text similarity (0 to 1)
+ */
+function calculateSimilarity(text1, text2) {
+  const norm1 = normalizeQuestionText(text1);
+  const norm2 = normalizeQuestionText(text2);
+
+  if (norm1 === norm2) return 1.0;
+  if (norm1.length === 0 || norm2.length === 0) return 0;
+
+  const maxLength = Math.max(norm1.length, norm2.length);
+  const distance = levenshteinDistance(norm1, norm2);
+  const similarity = 1 - distance / maxLength;
+
+  return Math.max(0, Math.min(1, similarity));
+}
+
+/**
+ * Extract keywords from question
+ */
+function extractKeywords(text) {
+  const normalized = normalizeQuestionText(text);
+  const words = normalized.split(/\s+/).filter(word => word.length > 2);
+  return new Set(words);
+}
+
+/**
+ * Calculate keyword overlap similarity (Jaccard similarity)
+ */
+function calculateKeywordOverlap(text1, text2) {
+  const keywords1 = extractKeywords(text1);
+  const keywords2 = extractKeywords(text2);
+
+  if (keywords1.size === 0 || keywords2.size === 0) return 0;
+
+  const intersection = new Set([...keywords1].filter(k => keywords2.has(k)));
+  const union = new Set([...keywords1, ...keywords2]);
+
+  return intersection.size / union.size;
+}
+
+/**
+ * Find most similar existing question from list
+ */
+function findMostSimilarQuestion(newQuestion, existingQuestions, threshold = 0.75) {
+  let bestMatch = null;
+  let bestSimilarity = 0;
+
+  for (const existing of existingQuestions) {
+    const textSim = calculateSimilarity(newQuestion, existing.text);
+    const keywordSim = calculateKeywordOverlap(newQuestion, existing.text);
+
+    // Weighted average: text similarity (70%) + keyword overlap (30%)
+    const combinedSim = textSim * 0.7 + keywordSim * 0.3;
+
+    if (combinedSim > bestSimilarity && combinedSim >= threshold) {
+      bestSimilarity = combinedSim;
+      bestMatch = existing;
+    }
+  }
+
+  return { match: bestMatch, similarity: bestSimilarity };
 }
 
 async function callOpenRouterWithFallback({ apiKey, messages, temperature = 0 }) {
@@ -202,6 +409,7 @@ app.post('/generate-quiz', async (req, res) => {
   const contextRaw = typeof req.body?.contextRaw === 'string' ? req.body.contextRaw.trim() : '';
   const contextSummary = typeof req.body?.contextSummary === 'string' ? req.body.contextSummary.trim() : '';
   const contextPurpose = typeof req.body?.contextPurpose === 'string' ? req.body.contextPurpose.trim() : '';
+  const responseFormat = req.body?.responseFormat === 'mcq' ? 'mcq' : 'questions';
   const contextTopics = Array.isArray(req.body?.contextTopics)
     ? req.body.contextTopics.filter((item) => typeof item === 'string').slice(0, 12)
     : [];
@@ -217,10 +425,30 @@ app.post('/generate-quiz', async (req, res) => {
   }
 
   try {
-    const messages = [
-      {
-        role: 'user',
-        content: `Create a classroom quiz of exactly 5 questions.
+    const prompt = responseFormat === 'mcq'
+      ? `Generate 5 MCQs based on the teaching context.
+
+Context:
+${contextSummary || contextRaw}
+Topics: ${contextTopics.join(', ')}
+
+Return JSON:
+[
+  {
+    "question": "...",
+    "options": ["A", "B", "C", "D"],
+    "correctAnswer": "..."
+  }
+]
+
+Rules:
+- Return exactly 5 objects.
+- Each question must have exactly 4 options.
+- Each question must have exactly 1 correct answer.
+- The correctAnswer value must match one option exactly.
+- Keep wording clear for students.
+- Use only the teaching context and listed topics.`
+      : `Create a classroom quiz of exactly 5 questions.
 
 Return ONLY valid JSON in this exact format:
 {
@@ -244,7 +472,12 @@ Topics:
 ${contextTopics.join(', ')}
 
 Raw Context:
-${contextRaw}`,
+${contextRaw}`;
+
+    const messages = [
+      {
+        role: 'user',
+        content: prompt,
       },
     ];
 
@@ -259,8 +492,10 @@ ${contextRaw}`,
     }
 
     try {
-      const jsonText = extractJsonFromText(content);
-      const parsed = parseQuizPayload(jsonText);
+      const jsonText = extractJsonFromText(content, responseFormat === 'mcq' ? 'array' : 'object');
+      const parsed = responseFormat === 'mcq'
+        ? parseMcqQuizPayload(jsonText)
+        : parseQuizPayload(jsonText);
       console.log('AI Response:', parsed);
 
       if (!parsed.questions.length) {
@@ -347,6 +582,236 @@ Return ONLY JSON:
   }
 });
 
-app.listen(PORT, () => {
+app.post('/generate-checkpoint-question', async (req, res) => {
+  const contextRaw = typeof req.body?.contextRaw === 'string' ? req.body.contextRaw.trim() : '';
+  const contextSummary = typeof req.body?.contextSummary === 'string' ? req.body.contextSummary.trim() : '';
+  const contextPurpose = typeof req.body?.contextPurpose === 'string' ? req.body.contextPurpose.trim() : '';
+  const contextTopics = Array.isArray(req.body?.contextTopics)
+    ? req.body.contextTopics.filter((item) => typeof item === 'string').slice(0, 12)
+    : [];
+
+  if (!contextRaw && !contextSummary && !contextPurpose && !contextTopics.length) {
+    return res.status(400).json({ error: 'Missing context for checkpoint question' });
+  }
+
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    console.error('[backend/generate-checkpoint-question] OPENROUTER_API_KEY is missing');
+    return res.status(500).json({ error: 'OPENROUTER_API_KEY missing' });
+  }
+
+  try {
+    const messages = [
+      {
+        role: 'user',
+        content: `Create exactly 1 multiple-choice checkpoint question for a student who clicked "Sort of" in class.
+
+Return ONLY valid JSON in this exact format:
+{
+  "question": "...",
+  "options": ["...", "...", "...", "..."],
+  "correctOptionIndex": 0
+}
+
+Rules:
+- Use the class context only.
+- Make the question easy to answer if the student truly understands the current concept.
+- Include exactly 4 options.
+- Include exactly 1 correct answer.
+- Make wrong options plausible but clearly incorrect.
+- Do not mention the correct answer outside the JSON field.
+- Keep wording concise and student-friendly.
+
+Context Summary:
+${contextSummary}
+
+Context Purpose:
+${contextPurpose}
+
+Topics:
+${contextTopics.join(', ')}
+
+Raw Context:
+${contextRaw}`,
+      },
+    ];
+
+    const { data, model } = await callOpenRouterWithFallback({ apiKey, messages, temperature: 0.2 });
+    console.log(JSON.stringify(data, null, 2));
+    console.log('[backend/generate-checkpoint-question] Model used:', model);
+    const content = data?.choices?.[0]?.message?.content;
+
+    if (!content) {
+      return res.status(502).json({ error: 'OpenRouter returned empty content' });
+    }
+
+    try {
+      const jsonText = extractJsonFromText(content);
+      const parsed = parseCheckpointPayload(jsonText);
+
+      if (!parsed) {
+        return res.status(502).json({ error: 'Invalid checkpoint question payload' });
+      }
+
+      return res.json(parsed);
+    } catch (parseError) {
+      console.error('[backend/generate-checkpoint-question] JSON parse failure:', parseError);
+      return res.status(502).json({ error: 'Invalid OpenRouter JSON payload' });
+    }
+  } catch (error) {
+    console.error('[backend/generate-checkpoint-question] ERROR:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ────────────────────────────────────────────────────────────────────────
+// DEDUPLICATION ENDPOINT - Submit question with automatic deduplication
+// ────────────────────────────────────────────────────────────────────────
+
+app.post('/submit-question-with-dedup', async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(500).json({
+        success: false,
+        questionId: '',
+        isDuplicate: false,
+        count: 0,
+        message: 'Firestore not initialized on server',
+      });
+    }
+
+    const { sessionId, questionText, studentId, similarityThreshold } = req.body;
+
+    // Validate input
+    if (!sessionId || !questionText || !studentId) {
+      return res.status(400).json({
+        success: false,
+        questionId: '',
+        isDuplicate: false,
+        count: 0,
+        message: 'Missing required fields: sessionId, questionText, studentId',
+      });
+    }
+
+    const cleanQuestion = String(questionText).trim();
+    if (!cleanQuestion) {
+      return res.status(400).json({
+        success: false,
+        questionId: '',
+        isDuplicate: false,
+        count: 0,
+        message: 'Question cannot be empty',
+      });
+    }
+
+    const threshold = typeof similarityThreshold === 'number' ? similarityThreshold : 0.75;
+
+    console.log(
+      `[/submit-question-with-dedup] Processing question for session ${sessionId}, student ${studentId}`
+    );
+
+    // Fetch all existing questions for this session
+    const questionsRef = collection(db, 'sessions', sessionId, 'questions');
+    const snapshot = await getDocs(questionsRef);
+
+    const existingQuestions = [];
+    snapshot.forEach((doc) => {
+      existingQuestions.push({
+        id: doc.id,
+        text: doc.data().text || '',
+        data: doc.data(),
+      });
+    });
+
+    // Find most similar question
+    const { match: similarQuestion, similarity: similarityScore } = findMostSimilarQuestion(
+      cleanQuestion,
+      existingQuestions,
+      threshold
+    );
+
+    if (similarQuestion) {
+      // Duplicate found - increment count
+      console.log(
+        `[/submit-question-with-dedup] Similar question found (similarity: ${(similarityScore * 100).toFixed(1)}%)`
+      );
+
+      const questionDocRef = doc(db, 'sessions', sessionId, 'questions', similarQuestion.id);
+      const oldData = similarQuestion.data;
+      const newCount = (oldData.count || 1) + 1;
+      const studentIds = oldData.studentIds || [];
+
+      if (!studentIds.includes(studentId)) {
+        studentIds.push(studentId);
+      }
+
+      await updateDoc(questionDocRef, {
+        count: newCount,
+        lastAskedAt: serverTimestamp(),
+        studentIds: studentIds,
+      });
+
+      console.log(
+        `[/submit-question-with-dedup] Question updated - count: ${newCount}, totalStudents: ${studentIds.length}`
+      );
+
+      return res.json({
+        success: true,
+        questionId: similarQuestion.id,
+        isDuplicate: true,
+        count: newCount,
+        similarity: similarityScore,
+        message: `Question merged with existing (${newCount} similar questions total)`,
+      });
+    } else {
+      // No similar question - create new entry
+      console.log('[/submit-question-with-dedup] No similar question found - creating new entry');
+
+      const newDocRef = await addDoc(questionsRef, {
+        text: cleanQuestion,
+        count: 1,
+        askedAt: serverTimestamp(),
+        lastAskedAt: serverTimestamp(),
+        upvotes: 0,
+        studentId: studentId,
+        studentIds: [studentId],
+      });
+
+      console.log(`[/submit-question-with-dedup] New question created with ID: ${newDocRef.id}`);
+
+      return res.json({
+        success: true,
+        questionId: newDocRef.id,
+        isDuplicate: false,
+        count: 1,
+        similarity: 0,
+        message: 'Question submitted successfully',
+      });
+    }
+  } catch (error) {
+    console.error('[/submit-question-with-dedup] ERROR:', error);
+    return res.status(500).json({
+      success: false,
+      questionId: '',
+      isDuplicate: false,
+      count: 0,
+      message: `Server error: ${error?.message || 'Unknown error'}`,
+    });
+  }
+});
+
+const server = app.listen(PORT, () => {
   console.log(`[backend] Server listening on http://0.0.0.0:${PORT}`);
+});
+
+server.on('error', (error) => {
+  if (error && error.code === 'EADDRINUSE') {
+    console.error(`[backend] Port ${PORT} is already in use.`);
+    console.error(`[backend] Stop the process using port ${PORT}, or start this server with a different port.`);
+    console.error(`[backend] PowerShell: $env:PORT=${PORT + 1}; npm run server`);
+    process.exit(1);
+  }
+
+  console.error('[backend] Server failed to start:', error);
+  process.exit(1);
 });

@@ -1,0 +1,7 @@
+Node.js (v20.17.0) is outdated and unsupported. Please update to a newer Node.js LTS version (required: >=20.19.4)
+Go to: https://nodejs.org/en/download
+
+  --non-interactive is not supported, use $CI=1 instead
+Input is required, but 'npx expo' is in non-interactive mode.
+Required input:
+> Use port 8082 instead?

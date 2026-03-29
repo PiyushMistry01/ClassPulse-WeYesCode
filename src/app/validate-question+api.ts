@@ -2,7 +2,8 @@ type ValidateQuestionResponse = {
   isRelevant: boolean;
 };
 
-const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_MODEL = 'openrouter/auto';
 
 function toStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) {
@@ -48,9 +49,9 @@ export async function POST(request: Request) {
       return Response.json({ isRelevant: false }, { status: 200 });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY || process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY || process.env.EXPO_PUBLIC_OPENROUTER_API_KEY;
     if (!apiKey) {
-      console.error('[validate-question] CRITICAL: OPENAI_API_KEY is not set');
+      console.error('[validate-question] CRITICAL: OPENROUTER_API_KEY is not set');
       return Response.json({ isRelevant: false }, { status: 200 });
     }
 
@@ -90,23 +91,24 @@ Return ONLY valid JSON (no other text):
   "isRelevant": true or false
 }`;
 
-    const openAiRes = await fetch(OPENAI_URL, {
+    const openAiRes = await fetch(OPENROUTER_URL, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://classpulse-97289.web.app',
+        'X-Title': 'ClassPulse',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: OPENROUTER_MODEL,
         temperature: 0,
-        response_format: { type: 'json_object' },
         messages: [{ role: 'user', content: prompt }],
       }),
     });
 
     if (!openAiRes.ok) {
       const detail = await openAiRes.text();
-      console.error('OpenAI API error:', openAiRes.status, detail);
+      console.error('OpenRouter API error:', openAiRes.status, detail);
       return Response.json({ isRelevant: false }, { status: 200 });
     }
 
@@ -115,10 +117,10 @@ Return ONLY valid JSON (no other text):
     };
 
     const raw = openAiData.choices?.[0]?.message?.content;
-    console.log('[validate-question API] 🤖 OpenAI raw response:', raw);
+    console.log('[validate-question API] 🤖 OpenRouter raw response:', raw);
     
     if (!raw) {
-      console.warn('No content from OpenAI response');
+      console.warn('No content from OpenRouter response');
       return Response.json({ isRelevant: false }, { status: 200 });
     }
 
@@ -132,7 +134,7 @@ Return ONLY valid JSON (no other text):
       const firstBrace = raw.indexOf('{');
       const lastBrace = raw.lastIndexOf('}');
       if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
-        console.warn('[validate-question API] ❌ No valid JSON found in OpenAI response');
+        console.warn('[validate-question API] ❌ No valid JSON found in OpenRouter response');
         return Response.json({ isRelevant: false });
       }
 

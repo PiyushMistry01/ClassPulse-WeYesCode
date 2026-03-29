@@ -1,13 +1,18 @@
-import {
-  View, Text, TouchableOpacity, StyleSheet,
-  SafeAreaView, ScrollView, Share, ActivityIndicator
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import QRCode from 'react-native-qrcode-svg';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import { doc, updateDoc } from 'firebase/firestore';
+import { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    SafeAreaView, ScrollView, Share,
+    StyleSheet,
+    Text, TouchableOpacity,
+    View
+} from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
+import LanguageSwitcher from '../components/language-switcher';
+import { db } from '../firebase';
+import { useI18n } from '../hooks/use-i18n';
 
 type SessionParams = {
   sessionId: string;
@@ -16,17 +21,20 @@ type SessionParams = {
   teacherName: string;
   alertThreshold: string;
   isOffline: string;
+  apiBaseUrl?: string;
 };
 
 export default function SessionCode() {
   console.log('🖥️ SessionCode screen mounted');  
   const router = useRouter();
+  const { i18n } = useI18n();
   const [params, setParams] = useState<SessionParams | null>(null);
   const [activating, setActivating] = useState(false);
   const [loadError, setLoadError] = useState('');
   const isOffline = params?.isOffline === 'true';
+  const encodedApiBase = encodeURIComponent((params?.apiBaseUrl || '').trim());
   const studentUrl = params
-  ? `https://classpulse-97289.web.app/student.html?session=${encodeURIComponent(params.sessionId)}`
+  ? `https://classpulse-97289.web.app/student.html?v=20260329&session=${encodeURIComponent(params.sessionId)}${encodedApiBase ? `&api=${encodedApiBase}` : ''}`
   : '';
 
   useEffect(() => {
@@ -47,11 +55,11 @@ export default function SessionCode() {
         console.log('⚠️ Got null, retrying in 300ms...');
         setTimeout(load, 300);
       } else {
-        setLoadError('No session data found. Go back and create a session.');
+        setLoadError(i18n.t('noSessionData'));
       }
     } catch (e) {
       console.error('❌ AsyncStorage read error:', e);
-      setLoadError('Failed to load session data.');
+      setLoadError(i18n.t('failedLoadSession'));
     }
   };
 
@@ -60,8 +68,9 @@ export default function SessionCode() {
 
   const handleShare = async () => {
     if (!params) return;
+    const message = i18n.t('shareMessage', { url: studentUrl, code: params.code }) ?? '';
     await Share.share({
-      message: `Join my class!\nScan the QR or open: ${studentUrl}\nCode: ${params.code}`,
+      message,
     });
   };
 
@@ -85,7 +94,7 @@ export default function SessionCode() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#1A1A18" />
-          <Text style={styles.loadingText}>Loading session…</Text>
+          <Text style={styles.loadingText}>{i18n.t('loadingSession')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -98,7 +107,7 @@ export default function SessionCode() {
         <View style={styles.centered}>
           <Text style={styles.errorText}>{loadError}</Text>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>← Go Back</Text>
+            <Text style={styles.backBtnText}>{i18n.t('goBack')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -108,18 +117,19 @@ export default function SessionCode() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll}>
+        <LanguageSwitcher />
 
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.badge}>SESSION READY</Text>
+          <Text style={styles.badge}>{i18n.t('sessionReady')}</Text>
           <Text style={styles.title}>{params!.sessionName}</Text>
-          <Text style={styles.subtitle}>Share this with your students</Text>
+          <Text style={styles.subtitle}>{i18n.t('shareWithStudents')}</Text>
         </View>
 
         {/* Offline badge — ADD THIS HERE */}
 {isOffline && (
   <View style={styles.offlineBadge}>
-    <Text style={styles.offlineBadgeText}>📶 Offline Mode — Hotspot session</Text>
+    <Text style={styles.offlineBadgeText}>{`📶 ${i18n.t('offlineModeHotspot')}`}</Text>
   </View>
 )}
 
@@ -131,13 +141,13 @@ export default function SessionCode() {
             color="#1A1A18"
             backgroundColor="#FFFFFF"
           />
-          <Text style={styles.qrHint}>Scan to join instantly</Text>
+          <Text style={styles.qrHint}>{i18n.t('scanToJoin')}</Text>
         </View>
 
         {/* Divider */}
         <View style={styles.dividerRow}>
           <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>or enter code</Text>
+          <Text style={styles.dividerText}>{i18n.t('orEnterCode')}</Text>
           <View style={styles.dividerLine} />
         </View>
 
@@ -153,20 +163,20 @@ export default function SessionCode() {
         {/* Session info strip */}
         <View style={styles.infoStrip}>
           <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>TEACHER</Text>
+            <Text style={styles.infoLabel}>{i18n.t('teacherLabel')}</Text>
             <Text style={styles.infoValue}>{params!.teacherName}</Text>
           </View>
           <View style={styles.infoDivider} />
           <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>ALERT AT</Text>
-            <Text style={styles.infoValue}>{params!.alertThreshold}% lost</Text>
+            <Text style={styles.infoLabel}>{i18n.t('alertAt')}</Text>
+            <Text style={styles.infoValue}>{`${params!.alertThreshold}${i18n.t('percentLost')}`}</Text>
           </View>
         </View>
 
         {/* Actions */}
         <View style={styles.actions}>
           <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
-            <Text style={styles.shareBtnText}>Share code</Text>
+            <Text style={styles.shareBtnText}>{i18n.t('shareCode')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -176,13 +186,13 @@ export default function SessionCode() {
             activeOpacity={0.85}
           >
             <Text style={styles.startBtnText}>
-              {activating ? 'Starting…' : 'Start Session →'}
+              {activating ? i18n.t('starting') : i18n.t('startSession')}
             </Text>
           </TouchableOpacity>
         </View>
 
         <Text style={styles.waitNote}>
-          Wait for students to join before starting.
+          {i18n.t('waitStudentsJoin')}
         </Text>
 
       </ScrollView>

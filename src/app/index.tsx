@@ -1,50 +1,28 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { addDoc, collection, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
-  Alert,
-  Linking,
-  Modal,
-  Platform,
-  SafeAreaView, ScrollView, StatusBar,
-  StyleSheet,
-  Text, TextInput, TouchableOpacity,
-  View,
+    Alert,
+    Linking,
+    Modal,
+    Platform,
+    SafeAreaView, ScrollView, StatusBar,
+    StyleSheet,
+    Text, TextInput, TouchableOpacity,
+    View,
 } from 'react-native';
+import LanguageSwitcher from '../components/language-switcher';
 import { db } from '../firebase';
+import { useI18n } from '../hooks/use-i18n';
 
 function generate4DigitCode() {
   return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
-const hotspotSteps = [
-  {
-    num: '1',
-    title: 'Turn on Mobile Hotspot',
-    detail: Platform.OS === 'android'
-      ? 'Settings → Network & Internet → Hotspot & Tethering → Mobile Hotspot'
-      : 'Settings → Personal Hotspot → Allow Others to Join',
-  },
-  {
-    num: '2',
-    title: 'Note your hotspot name & password',
-    detail: 'Students will need these to connect via Wi-Fi. You can find them in the hotspot settings screen.',
-  },
-  {
-    num: '3',
-    title: 'Ask students to connect',
-    detail: 'Students open Wi-Fi on their phone → select your hotspot name → enter the password. No SIM card needed on their phones.',
-  },
-  {
-    num: '4',
-    title: 'Keep your phone plugged in',
-    detail: 'Hotspot drains battery faster than normal. A charger or power bank will keep the session running.',
-  },
-];
-
 export default function TeacherSetup() {
   const router = useRouter();
+  const { i18n, language } = useI18n();
   const [teacherName, setTeacherName]           = useState('');
   const [sessionName, setSessionName]           = useState('');
   const [contextRaw, setContextRaw]             = useState('');
@@ -54,14 +32,43 @@ export default function TeacherSetup() {
   const [error, setError]                       = useState('');
   const [showHotspotModal, setShowHotspotModal] = useState(false);
 
+  const hotspotSteps = useMemo(
+    () => [
+      {
+        num: '1',
+        title: i18n.t('hotspotStep1Title'),
+        detail:
+          Platform.OS === 'android'
+            ? i18n.t('hotspotStep1DetailAndroid')
+            : i18n.t('hotspotStep1DetailIos'),
+      },
+      {
+        num: '2',
+        title: i18n.t('hotspotStep2Title'),
+        detail: i18n.t('hotspotStep2Detail'),
+      },
+      {
+        num: '3',
+        title: i18n.t('hotspotStep3Title'),
+        detail: i18n.t('hotspotStep3Detail'),
+      },
+      {
+        num: '4',
+        title: i18n.t('hotspotStep4Title'),
+        detail: i18n.t('hotspotStep4Detail'),
+      },
+    ],
+    [i18n, language]
+  );
+
   function validate(): boolean {
     if (!teacherName.trim() || !sessionName.trim()) {
-      setError('Please fill in your name and session name.');
+      setError(i18n.t('validationFillNameSession'));
       return false;
     }
     const threshold = parseInt(alertThreshold);
     if (isNaN(threshold) || threshold < 1 || threshold > 100) {
-      setError('Alert threshold must be between 1 and 100.');
+      setError(i18n.t('validationThresholdRange'));
       return false;
     }
     setError('');
@@ -73,6 +80,7 @@ export default function TeacherSetup() {
     const code                 = generate4DigitCode();
     const threshold            = parseInt(alertThreshold);
     const normalizedContextRaw = contextRaw.trim().slice(0, 1000);
+    const apiBaseUrl           = process.env.EXPO_PUBLIC_API_BASE_URL?.trim() || '';
 
     const sessionRef = await addDoc(collection(db, 'sessions'), {
       teacherName:    teacherName.trim(),
@@ -83,6 +91,7 @@ export default function TeacherSetup() {
       active:         false,
       isOffline,
       contextRaw:     normalizedContextRaw,
+      apiBaseUrl,
       students:       {},
       questions:      [],
     });
@@ -91,7 +100,6 @@ export default function TeacherSetup() {
     if (normalizedContextRaw) {
       void (async () => {
         try {
-          const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
           if (!apiBaseUrl) {
             console.warn('EXPO_PUBLIC_API_BASE_URL is missing; skipping context extraction');
             return;
@@ -128,6 +136,7 @@ export default function TeacherSetup() {
       alertThreshold: threshold.toString(),
       alertMins:      '15',
       isOffline:      isOffline ? 'true' : 'false',
+      apiBaseUrl,
     };
 
     await AsyncStorage.setItem('currentSession', JSON.stringify(sessionData));
@@ -144,7 +153,7 @@ export default function TeacherSetup() {
       await createSession(false);
     } catch (e: any) {
       console.error('Error creating session:', e);
-      setError('Could not create session. Check your connection.');
+      setError(i18n.t('createSessionError'));
     } finally {
       setLoading(false);
     }
@@ -165,9 +174,9 @@ export default function TeacherSetup() {
     } catch (e: any) {
       console.error('Offline session error:', e);
       Alert.alert(
-        'Connection Error',
-        'Could not reach the server. Make sure your mobile data is turned on — students use your hotspot, but you still need data to sync.',
-        [{ text: 'OK' }]
+        i18n.t('connectionErrorTitle'),
+        i18n.t('connectionErrorBody'),
+        [{ text: i18n.t('ok') }]
       );
     } finally {
       setOfflineLoading(false);
@@ -194,18 +203,18 @@ export default function TeacherSetup() {
           <View style={styles.modalCard}>
             <ScrollView showsVerticalScrollIndicator={false}>
 
-              <Text style={styles.modalBadge}>OFFLINE MODE</Text>
-              <Text style={styles.modalTitle}>Set up your hotspot</Text>
+              <Text style={styles.modalBadge}>{i18n.t('offlineMode')}</Text>
+              <Text style={styles.modalTitle}>{i18n.t('setupHotspot')}</Text>
               <Text style={styles.modalSub}>
-                Students connect to your phone's Wi-Fi. You still need mobile data — students don't.
+                {i18n.t('modalSub')}
               </Text>
 
               <View style={styles.needsBox}>
-                <Text style={styles.needsTitle}>WHAT YOU NEED</Text>
+                <Text style={styles.needsTitle}>{i18n.t('whatYouNeed')}</Text>
                 {[
-                  'Your phone with mobile data turned on',
-                  "Students' phones with Wi-Fi (no SIM needed)",
-                  'Hotspot enabled on your phone (steps below)',
+                  i18n.t('needTeacherData'),
+                  i18n.t('needStudentsWifi'),
+                  i18n.t('needHotspotEnabled'),
                 ].map((item, i) => (
                   <View key={i} style={styles.needsRow}>
                     <View style={styles.needsDot} />
@@ -227,10 +236,10 @@ export default function TeacherSetup() {
               ))}
 
               <TouchableOpacity style={styles.settingsBtn} onPress={openSettings}>
-                <Text style={styles.settingsBtnText}>Open Phone Settings →</Text>
+                <Text style={styles.settingsBtnText}>{i18n.t('openPhoneSettings')}</Text>
               </TouchableOpacity>
               <Text style={styles.settingsHint}>
-                Tap above to open Settings, turn on hotspot, then come back here.
+                {i18n.t('settingsHint')}
               </Text>
 
               <TouchableOpacity
@@ -239,7 +248,7 @@ export default function TeacherSetup() {
                 activeOpacity={0.85}
               >
                 <Text style={styles.confirmBtnText}>
-                  Hotspot is on — Create Session →
+                  {i18n.t('hotspotOnCreateSession')}
                 </Text>
               </TouchableOpacity>
 
@@ -247,7 +256,7 @@ export default function TeacherSetup() {
                 style={styles.cancelBtn}
                 onPress={() => setShowHotspotModal(false)}
               >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
+                <Text style={styles.cancelBtnText}>{i18n.t('cancel')}</Text>
               </TouchableOpacity>
 
             </ScrollView>
@@ -258,21 +267,23 @@ export default function TeacherSetup() {
       {/* Main Form */}
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
 
+        <LanguageSwitcher />
+
         <View style={styles.header}>
-          <Text style={styles.badge}>TEACHER</Text>
-          <Text style={styles.title}>New Session</Text>
+          <Text style={styles.badge}>{i18n.t('teacherBadge')}</Text>
+          <Text style={styles.title}>{i18n.t('newSession')}</Text>
           <Text style={styles.subtitle}>
-            Students join anonymously — you see only the room.
+            {i18n.t('studentsJoinAnon')}
           </Text>
         </View>
 
         <View style={styles.form}>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Your name</Text>
+            <Text style={styles.label}>{i18n.t('yourName')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g. Mrs. Sharma"
+              placeholder={i18n.t('yourNamePlaceholder')}
               placeholderTextColor="#AEACA6"
               value={teacherName}
               onChangeText={setTeacherName}
@@ -281,10 +292,10 @@ export default function TeacherSetup() {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Session name</Text>
+            <Text style={styles.label}>{i18n.t('sessionName')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g. Chapter 4 — Fractions"
+              placeholder={i18n.t('sessionNamePlaceholder')}
               placeholderTextColor="#AEACA6"
               value={sessionName}
               onChangeText={setSessionName}
@@ -293,10 +304,10 @@ export default function TeacherSetup() {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>What are you going to teach today?</Text>
+            <Text style={styles.label}>{i18n.t('teachToday')}</Text>
             <TextInput
               style={[styles.input, styles.contextInput]}
-              placeholder="Example: Today I will explain pointers, memory and arrays"
+              placeholder={i18n.t('contextPlaceholder')}
               placeholderTextColor="#AEACA6"
               value={contextRaw}
               onChangeText={setContextRaw}
@@ -306,12 +317,12 @@ export default function TeacherSetup() {
               textAlignVertical="top"
             />
             <Text style={styles.hint}>
-              This helps auto-tag session topics and filter student questions.
+              {i18n.t('contextHint')}
             </Text>
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Alert me when Lost exceeds</Text>
+            <Text style={styles.label}>{i18n.t('alertWhenLostExceeds')}</Text>
             <View style={styles.thresholdRow}>
               <TextInput
                 style={[styles.input, styles.thresholdInput]}
@@ -325,7 +336,7 @@ export default function TeacherSetup() {
               <Text style={styles.percentLabel}>%</Text>
             </View>
             <Text style={styles.hint}>
-              You'll get a gentle nudge when this many students are lost.
+              {i18n.t('alertHint')}
             </Text>
           </View>
 
@@ -339,14 +350,14 @@ export default function TeacherSetup() {
             disabled={loading || offlineLoading}
           >
             <Text style={styles.createBtnText}>
-              {loading ? 'Creating…' : 'Create Session →'}
+              {loading ? i18n.t('creating') : i18n.t('createSession')}
             </Text>
           </TouchableOpacity>
 
           {/* Divider */}
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>no classroom wi-fi?</Text>
+            <Text style={styles.dividerText}>{i18n.t('noClassroomWifi')}</Text>
             <View style={styles.dividerLine} />
           </View>
 
@@ -359,10 +370,10 @@ export default function TeacherSetup() {
           >
             <View>
               <Text style={styles.offlineBtnTitle}>
-                {offlineLoading ? 'Setting up…' : '📶  Create Offline Session'}
+                {offlineLoading ? i18n.t('settingUp') : `📶  ${i18n.t('createOfflineSession')}`}
               </Text>
               <Text style={styles.offlineBtnSub}>
-                Use your mobile hotspot — students join without a SIM card
+                {i18n.t('offlineBtnSub')}
               </Text>
             </View>
           </TouchableOpacity>
@@ -370,7 +381,7 @@ export default function TeacherSetup() {
         </View>
 
         <Text style={styles.footerNote}>
-          Students don't need an account or app — just a browser and the code.
+          {i18n.t('footerStudentsNoApp')}
         </Text>
 
       </ScrollView>

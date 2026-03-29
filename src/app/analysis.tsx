@@ -17,7 +17,9 @@ import {
     View,
 } from 'react-native';
 import Svg, { Circle, G, Line, Polyline, Text as SvgText } from 'react-native-svg';
+import LanguageSwitcher from '../components/language-switcher';
 import { db } from '../firebase';
+import { useI18n } from '../hooks/use-i18n';
 
 type Signal = 'got_it' | 'sort_of' | 'lost';
 
@@ -508,7 +510,19 @@ function EngagementRow({ title, value }: { title: string; value: string }) {
   );
 }
 
-function LineTrendChart({ timeline }: { timeline: MinutePoint[] }) {
+function LineTrendChart({
+  timeline,
+  emptyLabel,
+  gotLabel,
+  sortLabel,
+  lostLabel,
+}: {
+  timeline: MinutePoint[];
+  emptyLabel: string;
+  gotLabel: string;
+  sortLabel: string;
+  lostLabel: string;
+}) {
   const [chartWidth, setChartWidth] = useState(0);
   const chartHeight = 230;
   const padding = { top: 16, right: 10, bottom: 30, left: 26 };
@@ -608,14 +622,14 @@ function LineTrendChart({ timeline }: { timeline: MinutePoint[] }) {
 
       {timeline.length === 0 && (
         <View style={styles.emptyChart}>
-          <Text style={styles.emptyChartText}>No timestamped responses yet.</Text>
+          <Text style={styles.emptyChartText}>{emptyLabel}</Text>
         </View>
       )}
 
       <View style={styles.legendRow}>
-        <LegendDot label="Got it" color={SIGNAL_COLORS.got_it} />
-        <LegendDot label="Sort of" color={SIGNAL_COLORS.sort_of} />
-        <LegendDot label="Lost" color={SIGNAL_COLORS.lost} />
+        <LegendDot label={gotLabel} color={SIGNAL_COLORS.got_it} />
+        <LegendDot label={sortLabel} color={SIGNAL_COLORS.sort_of} />
+        <LegendDot label={lostLabel} color={SIGNAL_COLORS.lost} />
       </View>
     </View>
   );
@@ -632,6 +646,7 @@ function LegendDot({ label, color }: { label: string; color: string }) {
 
 export default function AnalysisScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId?: string }>();
+  const { i18n } = useI18n();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -643,7 +658,7 @@ export default function AnalysisScreen() {
   useEffect(() => {
     async function load() {
       if (!sessionId) {
-        setError('Missing session id.');
+        setError(i18n.t('analyticsLoadMissingId'));
         setLoading(false);
         return;
       }
@@ -655,7 +670,7 @@ export default function AnalysisScreen() {
         setStudents(bundle.students);
         setQuestions(bundle.questions);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to load analytics.';
+        const message = err instanceof Error ? err.message : i18n.t('analyticsLoadFailed');
         setError(message);
       } finally {
         setLoading(false);
@@ -707,7 +722,7 @@ export default function AnalysisScreen() {
           });
           return;
         }
-        Alert.alert('PDF Ready', `Report generated at: ${fallbackUri}`);
+        Alert.alert(i18n.t('pdfReadyTitle'), i18n.t('pdfReadyPath', { path: fallbackUri }));
         return;
       }
 
@@ -718,11 +733,11 @@ export default function AnalysisScreen() {
           dialogTitle: reportFilename,
         });
       } else {
-        Alert.alert('PDF Ready', `Report generated at: ${destinationUri}`);
+        Alert.alert(i18n.t('pdfReadyTitle'), i18n.t('pdfReadyPath', { path: destinationUri }));
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to generate PDF report.';
-      Alert.alert('PDF Export Failed', message);
+      const message = err instanceof Error ? err.message : i18n.t('pdfExportFailedBody');
+      Alert.alert(i18n.t('pdfExportFailed'), message);
     } finally {
       setExporting(false);
     }
@@ -733,7 +748,7 @@ export default function AnalysisScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#1A1A18" />
-          <Text style={styles.loadingText}>Loading post-session analytics...</Text>
+          <Text style={styles.loadingText}>{i18n.t('loadingAnalytics')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -752,13 +767,14 @@ export default function AnalysisScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll}>
+        <LanguageSwitcher />
         <View style={styles.header}>
           <View style={styles.headerTopRow}>
             <View style={styles.headerCopy}>
-              <Text style={styles.badge}>SESSION ANALYTICS</Text>
-              <Text style={styles.title}>{session?.sessionName ?? 'Session'}</Text>
+              <Text style={styles.badge}>{i18n.t('sessionAnalytics')}</Text>
+              <Text style={styles.title}>{session?.sessionName ?? i18n.t('sessionFallback')}</Text>
               <Text style={styles.subtitle}>
-                {session?.teacherName ?? 'Teacher'} · Code {session?.code ?? '--'}
+                {(session?.teacherName ?? i18n.t('teacherFallback'))} · {i18n.t('codeLabel', { code: session?.code ?? '--' })}
               </Text>
             </View>
             <TouchableOpacity
@@ -766,37 +782,43 @@ export default function AnalysisScreen() {
               style={[styles.downloadBtn, exporting && styles.downloadBtnDisabled]}
               disabled={exporting}
             >
-              <Text style={styles.downloadBtnText}>{exporting ? 'Preparing...' : 'Download PDF'}</Text>
+              <Text style={styles.downloadBtnText}>{exporting ? i18n.t('preparing') : i18n.t('downloadPdf')}</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         <View style={styles.summaryGrid}>
-          <SummaryCard label="Total responses" value={`${processed.totalResponses}`} sub="Students who responded" />
-          <SummaryCard label="Got it" value={`${processed.gotPct}%`} sub={`${processed.gotCount} responses`} tone="good" />
-          <SummaryCard label="Sort of" value={`${processed.sortPct}%`} sub={`${processed.sortCount} responses`} tone="sort" />
-          <SummaryCard label="Lost" value={`${processed.lostPct}%`} sub={`${processed.lostCount} responses`} tone="lost" />
+          <SummaryCard label={i18n.t('totalResponses')} value={`${processed.totalResponses}`} sub={i18n.t('studentsWhoResponded')} />
+          <SummaryCard label={i18n.t('gotIt')} value={`${processed.gotPct}%`} sub={i18n.t('responsesCount', { count: processed.gotCount })} tone="good" />
+          <SummaryCard label={i18n.t('sortOf')} value={`${processed.sortPct}%`} sub={i18n.t('responsesCount', { count: processed.sortCount })} tone="sort" />
+          <SummaryCard label={i18n.t('lost')} value={`${processed.lostPct}%`} sub={i18n.t('responsesCount', { count: processed.lostCount })} tone="lost" />
           <SummaryCard
-            label="Peak confusion"
+            label={i18n.t('peakConfusion')}
             value={processed.peakConfusion}
-            sub={`${processed.peakLostCount} lost at peak`}
+            sub={i18n.t('lostAtPeak', { count: processed.peakLostCount })}
           />
-          <SummaryCard label="Total questions" value={`${processed.totalQuestions}`} sub="Questions captured" />
+          <SummaryCard label={i18n.t('totalQuestions')} value={`${processed.totalQuestions}`} sub={i18n.t('questionsCaptured')} />
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Response Trend Over Time</Text>
-          <LineTrendChart timeline={processed.timeline} />
-          <Text style={styles.caption}>X-axis: time · Y-axis: response count · Lost spikes are highlighted.</Text>
+          <Text style={styles.sectionTitle}>{i18n.t('responseTrend')}</Text>
+          <LineTrendChart
+            timeline={processed.timeline}
+            emptyLabel={i18n.t('noTimestampedResponses')}
+            gotLabel={i18n.t('gotIt')}
+            sortLabel={i18n.t('sortOf')}
+            lostLabel={i18n.t('lost')}
+          />
+          <Text style={styles.caption}>{i18n.t('chartCaption')}</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Engagement Analytics</Text>
-          <EngagementRow title="Total students connected" value={`${processed.totalStudentsConnected}`} />
-          <EngagementRow title="Active participation rate" value={`${processed.activeParticipationRate}%`} />
+          <Text style={styles.sectionTitle}>{i18n.t('engagementAnalytics')}</Text>
+          <EngagementRow title={i18n.t('totalStudentsConnected')} value={`${processed.totalStudentsConnected}`} />
+          <EngagementRow title={i18n.t('activeParticipationRate')} value={`${processed.activeParticipationRate}%`} />
           <EngagementRow
-            title="Response frequency over time"
-            value={`${processed.avgResponsesPerInterval} responses per interval`}
+            title={i18n.t('responseFrequencyOverTime')}
+            value={i18n.t('responsesPerInterval', { value: processed.avgResponsesPerInterval })}
           />
           <View style={styles.inlineList}>
             {processed.dropIntervals.length > 0 ? (
@@ -807,14 +829,14 @@ export default function AnalysisScreen() {
               ))
             ) : (
               <View style={styles.alertPillMuted}>
-                <Text style={styles.alertTextMuted}>No drop intervals detected.</Text>
+                <Text style={styles.alertTextMuted}>{i18n.t('noDropIntervals')}</Text>
               </View>
             )}
           </View>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Confusion Detection</Text>
+          <Text style={styles.sectionTitle}>{i18n.t('confusionDetection')}</Text>
           <View style={styles.inlineList}>
             {processed.confusionAlerts.length > 0 ? (
               processed.confusionAlerts.map((alert) => (
@@ -824,24 +846,24 @@ export default function AnalysisScreen() {
               ))
             ) : (
               <View style={styles.alertPillOk}>
-                <Text style={styles.alertTextOk}>No high-confusion intervals detected.</Text>
+                <Text style={styles.alertTextOk}>{i18n.t('noHighConfusionIntervals')}</Text>
               </View>
             )}
           </View>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>AI Insights & Suggestions</Text>
+          <Text style={styles.sectionTitle}>{i18n.t('aiInsights')}</Text>
           {insights.insights.map((insight) => (
             <View key={insight} style={styles.insightBox}>
               <Text style={styles.insightText}>{insight}</Text>
             </View>
           ))}
-          <Text style={styles.caption}>Engine: {insights.source} (ready for future API integration)</Text>
+          <Text style={styles.caption}>{i18n.t('engineCaption', { source: insights.source })}</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Questions Analysis</Text>
+          <Text style={styles.sectionTitle}>{i18n.t('questionsAnalysis')}</Text>
 
           <View style={styles.themeWrap}>
             {themes.length > 0 ? (
@@ -853,7 +875,7 @@ export default function AnalysisScreen() {
                 </View>
               ))
             ) : (
-              <Text style={styles.emptyText}>No recurring themes yet.</Text>
+              <Text style={styles.emptyText}>{i18n.t('noThemesYet')}</Text>
             )}
           </View>
 
@@ -863,13 +885,13 @@ export default function AnalysisScreen() {
                 <View key={`${question.text}-${index}`} style={styles.questionItem}>
                   <Text style={styles.questionText}>{question.text}</Text>
                   <Text style={styles.questionMeta}>
-                    Frequency: {question.count}
-                    {question.latestAt ? ` · Latest: ${toTimeLabel(question.latestAt)}` : ''}
+                    {i18n.t('frequency', { count: question.count })}
+                    {question.latestAt ? ` · ${i18n.t('latestAt', { time: toTimeLabel(question.latestAt) })}` : ''}
                   </Text>
                 </View>
               ))
             ) : (
-              <Text style={styles.emptyText}>No questions were asked this session.</Text>
+              <Text style={styles.emptyText}>{i18n.t('noQuestionsThisSession')}</Text>
             )}
           </View>
         </View>
