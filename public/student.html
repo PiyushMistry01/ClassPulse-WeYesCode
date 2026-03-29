@@ -593,6 +593,8 @@
       let currentContextRaw = "";
       let currentContextTopics = [];
       let currentContextSummary = "";
+      let toggleHistory = [];
+let buttonsLockedUntil = 0;
 
       // ── Nudge state ───────────────────────────────────────────
       const NUDGE_DELAY    = 15;
@@ -600,9 +602,61 @@
       let nudgeSecondsLeft = NUDGE_DELAY;
       let nudgeArmedForRound = false;
 
-      const studentId = sessionStorage.getItem("studentId")
-        || ("stu_" + Math.random().toString(36).slice(2, 10));
-      sessionStorage.setItem("studentId", studentId);
+      function monitorToggleSpam() {
+
+  const now = Date.now();
+
+  if (now < buttonsLockedUntil) {
+    return false;
+  }
+
+  toggleHistory = toggleHistory.filter(t => now - t < 30000);
+  toggleHistory.push(now);
+
+  if (toggleHistory.length > 5) {
+    buttonsLockedUntil = now + 30000;
+    disableSignalButtons();
+
+    setTimeout(() => {
+      enableSignalButtons();
+    }, 30000);
+
+    return false;
+  }
+
+  return true;
+}
+
+function disableSignalButtons() {
+
+  document.querySelectorAll(".signal-btn").forEach(btn => {
+    btn.disabled = true;
+    btn.style.opacity = "0.5";
+  });
+}
+
+function enableSignalButtons() {
+
+  document.querySelectorAll(".signal-btn").forEach(btn => {
+    btn.disabled = false;
+    btn.style.opacity = "1";
+  });
+
+  toggleHistory = [];
+}
+
+     function getDeviceId() {
+  let deviceId = localStorage.getItem("deviceId");
+
+  if (!deviceId) {
+    deviceId = "dev_" + Math.random().toString(36).slice(2, 12);
+    localStorage.setItem("deviceId", deviceId);
+  }
+
+  return deviceId;
+}
+
+const studentId = getDeviceId();
 
       // ── Auto-connect from URL ─────────────────────────────────
       window.addEventListener("load", async () => {
@@ -663,6 +717,21 @@
           }
 
           sessionId  = sessionDoc.id;
+          const studentRef = doc(db, "sessions", sessionId, "students", studentId);
+
+const existingStudent = await getDoc(studentRef);
+
+if (existingStudent.exists()) {
+  errEl.textContent = "You have already joined this session.";
+  errEl.style.display = "block";
+  return;
+}
+
+// register student
+await setDoc(studentRef, {
+  joinedAt: serverTimestamp(),
+  deviceId: studentId
+});
           const data = sessionDoc.data();
 
           document.getElementById("sessionInfo").innerHTML = `
@@ -785,6 +854,8 @@
 
       // ── Signal selection ──────────────────────────────────────
       window.selectSignal = async function (signal) {
+        if (!monitorToggleSpam()) return;
+
         stopNudgeTimer();
         hideNudge();
 
